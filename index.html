@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Fetch Video Stream from API</title>
+  </head>
+  <body>
+    <video id="myVideo" controls>
+      <source src="/api/video/stream" type="video/mp4">
+    </video>
+
+    <script>
+      const video = document.getElementById('myVideo');
+      fetch('/api/video/stream')
+        .then(response => response.body)
+        .then(body => {
+          const reader = body.getReader();
+          return new ReadableStream({
+            start(controller) {
+              function pump() {
+                reader.read().then(({ done, value }) => {
+                  if (done) {
+                    controller.close();
+                    return;
+                  }
+                  controller.enqueue(value);
+                  pump();
+                });
+              }
+              pump();
+            }
+          });
+        })
+        .then(stream => new Response(stream))
+        .then(response => response.blob())
+        .then(blob => URL.createObjectURL(blob))
+        .then(url => {
+          video.src = url;
+        });
+    </script>
+  </body>
+</html>
