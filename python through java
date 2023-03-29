@@ -1,0 +1,11 @@
+import org.python.util.PythonInterpreter;
+import org.python.core.PyObject;
+
+public class Main {
+  public static void main(String[] args) {
+    PythonInterpreter interpreter = new PythonInterpreter();
+    interpreter.execfile("script.py");
+    PyObject someFunc = interpreter.get("test");
+    PyObject result = someFunc.__call__();
+  }
+}
