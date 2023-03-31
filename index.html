@@ -1,41 +1,49 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Fetch Video Stream from API</title>
-  </head>
-  <body>
-    <video id="myVideo" controls>
-      <source src="/api/video/stream" type="video/mp4">
-    </video>
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-    <script>
-      const video = document.getElementById('myVideo');
-      fetch('/api/video/stream')
-        .then(response => response.body)
-        .then(body => {
-          const reader = body.getReader();
-          return new ReadableStream({
-            start(controller) {
-              function pump() {
-                reader.read().then(({ done, value }) => {
-                  if (done) {
-                    controller.close();
-                    return;
-                  }
-                  controller.enqueue(value);
-                  pump();
-                });
-              }
-              pump();
+public class DeviceSessionTransformer {
+    public static void main(String[] args) {
+        List<DeviceSession> deviceSessions = new ArrayList<>(); // replace with your input list
+        
+        // Map to group device sessions by date
+        Map<LocalDate, List<DeviceSession>> sessionsByDate = new HashMap<>();
+        
+        // Separate running sessions from other sessions by date
+        List<DeviceSession> runningSessions = new ArrayList<>();
+        for (DeviceSession session : deviceSessions) {
+            if ("Running".equals(session.getStatus())) {
+                runningSessions.add(session);
+            } else {
+                LocalDate date = session.getStartTime().toLocalDate();
+                sessionsByDate.computeIfAbsent(date, k -> new ArrayList<>()).add(session);
             }
-          });
-        })
-        .then(stream => new Response(stream))
-        .then(response => response.blob())
-        .then(blob => URL.createObjectURL(blob))
-        .then(url => {
-          video.src = url;
-        });
-    </script>
-  </body>
-</html>
+        }
+        
+        // Build the final output structure
+        List<Map<String, Object>> otherSessionsByDate = new ArrayList<>();
+        for (LocalDate date : sessionsByDate.keySet()) {
+            Map<String, Object> dateSessions = new HashMap<>();
+            dateSessions.put("date", date.toString());
+            dateSessions.put("other", sessionsByDate.get(date));
+            otherSessionsByDate.add(dateSessions);
+        }
+        
+        Map<String, Object> output = new HashMap<>();
+        output.put("running", runningSessions);
+        output.put("other", otherSessionsByDate);
+        
+        // Print the output for verification
+        System.out.println(output);
+    }
+}
+
+class DeviceSession {
+    private String sessionId;
+    private LocalDateTime startTime;
+    private String status;
+    
+    // Constructors, getters, and setters omitted for brevity
+}
