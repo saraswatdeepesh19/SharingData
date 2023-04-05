@@ -1,49 +1,32 @@
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+@Configuration
+public class R2dbcConfiguration extends AbstractR2dbcConfiguration {
+    @Value("${spring.data.r2dbc.url}")
+    private String url;
 
-public class DeviceSessionTransformer {
-    public static void main(String[] args) {
-        List<DeviceSession> deviceSessions = new ArrayList<>(); // replace with your input list
-        
-        // Map to group device sessions by date
-        Map<LocalDate, List<DeviceSession>> sessionsByDate = new HashMap<>();
-        
-        // Separate running sessions from other sessions by date
-        List<DeviceSession> runningSessions = new ArrayList<>();
-        for (DeviceSession session : deviceSessions) {
-            if ("Running".equals(session.getStatus())) {
-                runningSessions.add(session);
-            } else {
-                LocalDate date = session.getStartTime().toLocalDate();
-                sessionsByDate.computeIfAbsent(date, k -> new ArrayList<>()).add(session);
-            }
-        }
-        
-        // Build the final output structure
-        List<Map<String, Object>> otherSessionsByDate = new ArrayList<>();
-        for (LocalDate date : sessionsByDate.keySet()) {
-            Map<String, Object> dateSessions = new HashMap<>();
-            dateSessions.put("date", date.toString());
-            dateSessions.put("other", sessionsByDate.get(date));
-            otherSessionsByDate.add(dateSessions);
-        }
-        
-        Map<String, Object> output = new HashMap<>();
-        output.put("running", runningSessions);
-        output.put("other", otherSessionsByDate);
-        
-        // Print the output for verification
-        System.out.println(output);
+    @Value("${spring.data.r2dbc.username}")
+    private String username;
+
+    @Value("${spring.data.r2dbc.password}")
+    private String password;
+
+    @Override
+    public R2dbcProperties r2dbcProperties() {
+        return new R2dbcProperties().setUrl(url).setUsername(username).setPassword(password);
     }
-}
 
-class DeviceSession {
-    private String sessionId;
-    private LocalDateTime startTime;
-    private String status;
-    
-    // Constructors, getters, and setters omitted for brevity
+    @Bean
+    public R2dbcEntityTemplate r2dbcEntityTemplate() {
+        return new R2dbcEntityTemplate(connectionFactory());
+    }
+
+    @Bean
+    public ConnectionFactory connectionFactory() {
+        return new PostgresqlConnectionFactory(PostgresqlConnectionConfiguration.builder()
+                .host(r2dbcProperties().getHost())
+                .port(r2dbcProperties().getPort())
+                .username(r2dbcProperties().getUsername())
+                .password(r2dbcProperties().getPassword())
+                .database(r2dbcProperties().getDatabase())
+                .build());
+    }
 }
