@@ -1,0 +1,14 @@
+{
+  "udid": "device-123",
+  "deviceName": "iPhone X",
+  "platform": "iOS",
+  "version": "14.5",
+  "hostName": "localhost",
+  "height": 1334,
+  "width": 750,
+  "controlPort": 8100,
+  "streamPort": 8200,
+  "manufacture": "Apple",
+  "psid": "ps-123",
+  "status": "online"
+}
