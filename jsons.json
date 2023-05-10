@@ -1,14 +1,42 @@
-{
-  "udid": "device-123",
-  "deviceName": "iPhone X",
-  "platform": "iOS",
-  "version": "14.5",
-  "hostName": "localhost",
-  "height": 1334,
-  "width": 750,
-  "controlPort": 8100,
-  "streamPort": 8200,
-  "manufacture": "Apple",
-  "psid": "ps-123",
-  "status": "online"
+@Entity
+@Table(name = "HML_IOS_DEVICES")
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class HmlIosDevices {
+
+    @Id
+    @NotBlank(message = "udid is mandatory")
+    private String udid;
+
+    @NotBlank(message = "deviceName is mandatory")
+    private String deviceName;
+
+    @NotBlank(message = "platform is mandatory")
+    private String platform;
+
+    @NotBlank(message = "version is mandatory")
+    private String version;
+
+    @NotBlank(message = "hostName is mandatory")
+    private String hostName;
+
+    @NotNull(message = "height is mandatory")
+    private Integer height;
+
+    @NotNull(message = "width is mandatory")
+    private Integer width;
+
+    @NotNull(message = "controlPort is mandatory")
+    private Integer controlPort;
+
+    @NotNull(message = "streamPort is mandatory")
+    private Integer streamPort;
+
+    @NotBlank(message = "manufacture is mandatory")
+    private String manufacture;
+
+    private String psid;
+
+    private String status;
 }
