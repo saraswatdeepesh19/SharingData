@@ -1,16 +1,41 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-	<title>Load Image from D drive</title>
-	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-	<script>
-		$(document).ready(function(){
-			var imagePath = "D:/sessionID/taskID.jpg";
-			$("#myImage").attr("src", imagePath);
-		});
-	</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE Demo</title>
 </head>
 <body>
-	<img id="myImage" alt="My Image" />
+
+<h1>Data Updates</h1>
+<div id="update-container"></div>
+
+<script>
+    const updateContainer = document.getElementById('update-container');
+
+    const eventSource = new EventSource('/sse/stream');
+
+    eventSource.onmessage = function (event) {
+        const message = event.data;
+
+        // Create a new paragraph element to display the message
+        const paragraph = document.createElement('p');
+        paragraph.textContent = message;
+
+        // Add the paragraph to the update container
+        updateContainer.appendChild(paragraph);
+    };
+
+    eventSource.onerror = function (error) {
+        console.error('Error occurred:', error);
+        eventSource.close();
+    };
+
+    // Close the SSE connection when the page is closed or unloaded
+    window.addEventListener('beforeunload', function () {
+        eventSource.close();
+    });
+</script>
+
 </body>
 </html>
