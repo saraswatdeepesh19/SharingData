@@ -1,54 +1,44 @@
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-public class UrlEncoderDecoder {
-
-    public static String encodeUrls(List<String> urls) {
-        StringBuilder encodedUrls = new StringBuilder();
-
-        for (String url : urls) {
-            try {
-                String encodedUrl = URLEncoder.encode(url, "UTF-8");
-                encodedUrls.append(encodedUrl).append(",");
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace(); // Handle encoding exception as needed
-            }
-        }
-
-        return encodedUrls.toString();
-    }
-
-    public static List<String> decodeUrls(String encodedUrls) {
-        List<String> decodedUrls = new ArrayList<>();
-        String[] urlArray = encodedUrls.split(",");
-
-        for (String encodedUrl : urlArray) {
-            try {
-                String decodedUrl = URLDecoder.decode(encodedUrl, "UTF-8");
-                decodedUrls.add(decodedUrl);
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace(); // Handle decoding exception as needed
-            }
-        }
-
-        return decodedUrls;
-    }
+public class ParallelUrlExecution {
 
     public static void main(String[] args) {
-        List<String> originalUrls = new ArrayList<>();
-        originalUrls.add("https://www.example.com/page1");
-        originalUrls.add("https://www.example.com/page2");
-        originalUrls.add("https://www.example.com/page3");
+        List<String> urls = new ArrayList<>();
+        urls.add("https://www.example.com/page1");
+        urls.add("https://www.example.com/page2");
+        urls.add("https://www.example.com/page3");
 
-        // Encode URLs
-        String encodedUrls = encodeUrls(originalUrls);
-        System.out.println("Encoded URLs: " + encodedUrls);
+        executeUrlsInParallel(urls);
+    }
 
-        // Decode URLs
-        List<String> decodedUrls = decodeUrls(encodedUrls);
-        System.out.println("Decoded URLs: " + decodedUrls);
+    public static void executeUrlsInParallel(List<String> urls) {
+        int numberOfThreads = Math.min(urls.size(), Runtime.getRuntime().availableProcessors());
+        ExecutorService executorService = Executors.newFixedThreadPool(numberOfThreads);
+
+        for (String url : urls) {
+            executorService.execute(() -> executeUrl(url));
+        }
+
+        executorService.shutdown();
+        try {
+            executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace(); // Handle exception as needed
+        }
+    }
+
+    public static void executeUrl(String url) {
+        // Replace this with the actual command or logic to execute the URL
+        try {
+            Process process = new ProcessBuilder("curl", url).start();
+            int exitCode = process.waitFor();
+            System.out.println("URL: " + url + " executed with exit code: " + exitCode);
+        } catch (Exception e) {
+            e.printStackTrace(); // Handle exception as needed
+        }
     }
 }
