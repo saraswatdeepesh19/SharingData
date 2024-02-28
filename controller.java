@@ -1,13 +1,43 @@
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 
-public interface UserRepository extends JpaRepository<UserClass, Long> {
-    
-    @Query(value = "SELECT DISTINCT session_id FROM user_class WHERE queue_flag = 'N' ORDER BY id LIMIT 1", nativeQuery = true)
-    String findNextSessionIdOrderByUserId();
+@Component
+public class UserProcessor {
 
-    @Query(value = "SELECT * FROM user_class WHERE session_id = :sessionId AND queue_flag = 'N' ORDER BY id LIMIT 25", nativeQuery = true)
-    List<UserClass> findNext25RowsForSessionId(@Param("sessionId") String sessionId);
+    @Autowired
+    private UserRepository userRepository;
+
+    @Transactional
+    public void processAndQueueData(BlockingQueue<UserClassList> queue) {
+        try {
+            // Fetch the next session ID based on order by id and queueFlag = 'N'
+            String sessionId = userRepository.findNextSessionIdOrderByUserId();
+
+            // Fetch the first 25 rows for the obtained session ID
+            List<UserClass> userData = userRepository.findNext25RowsForSessionId(sessionId);
+
+            // Update queueFlag in the database for the fetched rows
+            updateQueueFlagInDatabase(userData);
+
+            // Create UserClassList and add it to the queue
+            UserClassList userClassList = new UserClassList(userData);
+            queue.put(userClassList);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            // Handle interruption
+        }
+    }
+
+    @Transactional
+    private void updateQueueFlagInDatabase(List<UserClass> userData) {
+        for (UserClass user : userData) {
+            // Update the queueFlag column in the database for each user
+            user.setQueueFlag("Y");
+            userRepository.save(user);
+        }
+    }
 }
