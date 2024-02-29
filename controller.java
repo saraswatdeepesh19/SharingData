@@ -1,43 +1,63 @@
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestTemplate;
 
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
-@Component
-public class UserProcessor {
+public class JsonDownloader {
 
-    @Autowired
-    private UserRepository userRepository;
+    public static void main(String[] args) {
+        // Define the REST API URL
+        String apiUrl = "https://example.com/api/data";
 
-    @Transactional
-    public void processAndQueueData(BlockingQueue<UserClassList> queue) {
-        try {
-            // Fetch the next session ID based on order by id and queueFlag = 'N'
-            String sessionId = userRepository.findNextSessionIdOrderByUserId();
+        // Define the directory path to store the JSON
+        String directoryPath = "/path/to/your/directory";
 
-            // Fetch the first 25 rows for the obtained session ID
-            List<UserClass> userData = userRepository.findNext25RowsForSessionId(sessionId);
+        // Make the REST API request
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<String> responseEntity = restTemplate.getForEntity(apiUrl, String.class);
 
-            // Update queueFlag in the database for the fetched rows
-            updateQueueFlagInDatabase(userData);
+        // Check if the request was successful (HTTP status code 200)
+        if (responseEntity.getStatusCode().is2xxSuccessful()) {
+            // Get the JSON response body
+            String jsonResponse = responseEntity.getBody();
 
-            // Create UserClassList and add it to the queue
-            UserClassList userClassList = new UserClassList(userData);
-            queue.put(userClassList);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            // Handle interruption
+            // Create the directory if it doesn't exist
+            createDirectory(directoryPath);
+
+            // Save the JSON to a file in the specified directory
+            saveJsonToFile(directoryPath, "response.json", jsonResponse);
+
+            System.out.println("JSON downloaded and saved successfully.");
+        } else {
+            System.out.println("Failed to retrieve JSON. HTTP Status Code: " + responseEntity.getStatusCodeValue());
         }
     }
 
-    @Transactional
-    private void updateQueueFlagInDatabase(List<UserClass> userData) {
-        for (UserClass user : userData) {
-            // Update the queueFlag column in the database for each user
-            user.setQueueFlag("Y");
-            userRepository.save(user);
+    private static void createDirectory(String directoryPath) {
+        Path directory = Paths.get(directoryPath);
+
+        if (!Files.exists(directory)) {
+            try {
+                Files.createDirectories(directory);
+            } catch (IOException e) {
+                e.printStackTrace();
+                // Handle directory creation failure
+            }
+        }
+    }
+
+    private static void saveJsonToFile(String directoryPath, String fileName, String jsonContent) {
+        Path filePath = Paths.get(directoryPath, fileName);
+
+        try (FileWriter fileWriter = new FileWriter(filePath.toString())) {
+            fileWriter.write(jsonContent);
+        } catch (IOException e) {
+            e.printStackTrace();
+            // Handle file writing failure
         }
     }
 }
