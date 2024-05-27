@@ -1,14 +1,1 @@
-Subject: Request to Log Off Early Due to Eye Irritation
-
-Dear [Colleague's Name],
-
-I hope this email finds you well.
-
-I am writing to inform you that I have been experiencing significant eye irritation and watery eyes today. Despite my efforts to manage it, the discomfort has persisted and is affecting my ability to focus on work tasks.
-
-To prevent any further strain and to ensure I can recover quickly, I would like to request permission to log off early today. I will make sure to complete any urgent tasks and will be available via phone if something requires my immediate attention.
-
-Thank you for your understanding and support.
-
-Best regards,
-[Your Name]
+ffmpeg -f gdigrab -framerate 30 -i desktop -c:v libx264 -b:v 3000k -f flv rtmp://your.streaming.server/live/streamkey
