@@ -1,34 +1,17 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Screen Recorder</title>
-</head>
-<body>
-  <button id="startBtn">Start Recording</button>
-  <button id="stopBtn">Stop Recording</button>
-  <video id="video" width="600" controls></video>
+from flask import Flask, Response
 
-  <script>
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const video = document.getElementById('video');
+app = Flask(__name__)
 
-    startBtn.addEventListener('click', () => {
-      fetch('/start', { method: 'POST' })
-        .then(response => response.text())
-        .then(data => console.log(data));
-    });
+@app.route('/live.flv')
+def live_flv():
+    def generate():
+        with open('video.flv', 'rb') as f:
+            while True:
+                data = f.read(1024)
+                if not data:
+                    break
+                yield data
+    return Response(generate(), mimetype='video/x-flv')
 
-    stopBtn.addEventListener('click', () => {
-      fetch('/stop', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-          console.log(data.message);
-          video.src = data.url;
-        });
-    });
-  </script>
-</body>
-</html>
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
