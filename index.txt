@@ -28,6 +28,10 @@
     <script>
         let lastImageUpdateTime = 0;
         const minimumDisplayTime = 2; // Minimum display time in milliseconds
+        const reconnectInterval = 5000; // Reconnection interval in milliseconds
+
+        let userId;
+        let socket;
 
         // Function to prompt the user for their user ID
         function promptForUserId() {
@@ -36,18 +40,18 @@
 
         // Function to establish WebSocket connection with the provided user ID
         function connectToWebSocket() {
-            const userId = promptForUserId(); // Prompt user for user ID
+            userId = promptForUserId(); // Prompt user for user ID
             if (!userId) {
                 alert("User ID cannot be empty!");
                 return;
             }
 
-            const socket = new WebSocket("ws://abcd12345.hbap.adroot.hsb:8080/image-stream?userId=" + userId);
+            socket = new WebSocket("ws://abcd12345.hbap.adroot.hsb:8080/image-stream?userId=" + userId);
 
             socket.onmessage = function(event) {
                 const now = Date.now();
                 const timeSinceLastUpdate = now - lastImageUpdateTime;
-                
+
                 if (timeSinceLastUpdate >= minimumDisplayTime) {
                     updateImage(event.data);
                 } else {
@@ -62,7 +66,8 @@
             };
 
             socket.onclose = function() {
-                console.log("Disconnected from the server");
+                console.log("Disconnected from the server, attempting to reconnect...");
+                setTimeout(connectToWebSocket, reconnectInterval); // Attempt to reconnect after a delay
             };
 
             socket.onerror = function(error) {
