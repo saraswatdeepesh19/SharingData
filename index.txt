@@ -26,26 +26,42 @@
         <img id="live-image" alt="Live Stream"/>
     </div>
     <script>
-        const userId = 'someUserId'; // Replace with actual user ID
-        const socket = new WebSocket("ws://abcd12345.hbap.adroot.hsb:8080/image-stream?userId=" + userId);
+        // Function to prompt the user for their user ID
+        function promptForUserId() {
+            return prompt("Please enter your user ID:", "");
+        }
 
-        socket.onmessage = function(event) {
-            console.log("Received message:", event.data); // Log received data
-            const imageElement = document.getElementById("live-image");
-            imageElement.src = 'data:image/png;base64,' + event.data; // Ensure correct MIME type
-        };
+        // Function to establish WebSocket connection with the provided user ID
+        function connectToWebSocket() {
+            const userId = promptForUserId(); // Prompt user for user ID
+            if (!userId) {
+                alert("User ID cannot be empty!");
+                return;
+            }
 
-        socket.onopen = function() {
-            console.log("Connected to the server");
-        };
+            const socket = new WebSocket("ws://abcd12345.hbap.adroot.hsb:8080/image-stream?userId=" + userId);
 
-        socket.onclose = function() {
-            console.log("Disconnected from the server");
-        };
+            socket.onmessage = function(event) {
+                console.log("Received message:", event.data); // Log received data
+                const imageElement = document.getElementById("live-image");
+                imageElement.src = 'data:image/png;base64,' + event.data; // Ensure correct MIME type
+            };
 
-        socket.onerror = function(error) {
-            console.error("WebSocket error:", error);
-        };
+            socket.onopen = function() {
+                console.log("Connected to the server");
+            };
+
+            socket.onclose = function() {
+                console.log("Disconnected from the server");
+            };
+
+            socket.onerror = function(error) {
+                console.error("WebSocket error:", error);
+            };
+        }
+
+        // Connect to WebSocket when the page loads
+        window.onload = connectToWebSocket;
     </script>
 </body>
 </html>
