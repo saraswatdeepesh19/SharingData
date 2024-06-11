@@ -1,50 +1,29 @@
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
-import org.springframework.web.socket.handler.TextWebSocketHandler;
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live Image Stream</title>
+</head>
+<body>
+    <img id="live-image" alt="Live Stream"/>
+    <script>
+        const socket = new WebSocket("ws://localhost:8080/image-stream");
 
-import java.io.IOException;
-import java.nio.file.*;
+        socket.onmessage = function(event) {
+            const imageElement = document.getElementById("live-image");
+            imageElement.src = 'data:image/png;base64,' + event.data;
+        };
 
-public class ImageWebSocketHandler extends TextWebSocketHandler {
+        socket.onopen = function() {
+            console.log("Connected to the server");
+        };
 
-    private static final String IMAGE_FOLDER = "/path/to/image/folder";
-    
-    @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        super.afterConnectionEstablished(session);
-        watchFolder(session);
-    }
-    
-    private void watchFolder(WebSocketSession session) {
-        try {
-            WatchService watchService = FileSystems.getDefault().newWatchService();
-            Paths.get(IMAGE_FOLDER).register(watchService, StandardWatchEventKinds.ENTRY_CREATE);
+        socket.onclose = function() {
+            console.log("Disconnected from the server");
+        };
 
-            while (true) {
-                WatchKey key = watchService.take();
-                for (WatchEvent<?> event : key.pollEvents()) {
-                    WatchEvent.Kind<?> kind = event.kind();
-
-                    if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
-                        Path filePath = ((WatchEvent<Path>) event).context();
-                        sendImage(session, filePath.toString());
-                    }
-                }
-                key.reset();
-            }
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
-    }
-    
-    private void sendImage(WebSocketSession session, String fileName) {
-        try {
-            String imagePath = IMAGE_FOLDER + "/" + fileName;
-            byte[] imageBytes = Files.readAllBytes(Paths.get(imagePath));
-            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
-            session.sendMessage(new TextMessage(base64Image));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-}
+        socket.onerror = function(error) {
+            console.error("WebSocket error:", error);
+        };
+    </script>
+</body>
+</html>
