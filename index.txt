@@ -1,17 +1,15 @@
-from flask import Flask, Response
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.socket.config.annotation.EnableWebSocket;
+import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 
-app = Flask(__name__)
+@Configuration
+@EnableWebSocket
+public class WebSocketConfig implements WebSocketConfigurer {
 
-@app.route('/live.flv')
-def live_flv():
-    def generate():
-        with open('video.flv', 'rb') as f:
-            while True:
-                data = f.read(1024)
-                if not data:
-                    break
-                yield data
-    return Response(generate(), mimetype='video/x-flv')
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    @Override
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        registry.addHandler(new ImageWebSocketHandler(), "/image-stream")
+                .setAllowedOrigins("*");
+    }
+}
