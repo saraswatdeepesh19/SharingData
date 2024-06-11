@@ -9,8 +9,9 @@
         const socket = new WebSocket("ws://localhost:8080/image-stream");
 
         socket.onmessage = function(event) {
+            console.log("Received message:", event.data); // Log received data
             const imageElement = document.getElementById("live-image");
-            imageElement.src = 'data:image/png;base64,' + event.data;
+            imageElement.src = 'data:image/png;base64,' + event.data; // Ensure correct MIME type
         };
 
         socket.onopen = function() {
