@@ -2,87 +2,28 @@
 <html>
 <head>
     <title>Live Image Stream</title>
-    <style>
-        #image-container {
-            width: 80%;  /* Adjust as needed */
-            height: 80vh;  /* Adjust as needed */
-            margin: auto;
-            border: 1px solid #ccc;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-        }
-
-        #live-image {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
-    </style>
 </head>
 <body>
-    <div id="image-container">
-        <img id="live-image" alt="Live Stream"/>
-    </div>
+    <img id="live-image" alt="Live Stream"/>
     <script>
-        let lastImageUpdateTime = 0;
-        const minimumDisplayTime = 2; // Minimum display time in milliseconds
-        const reconnectInterval = 5000; // Reconnection interval in milliseconds
+        const socket = new WebSocket("ws://localhost:8080/image-stream");
 
-        let userId;
-        let socket;
-
-        // Function to prompt the user for their user ID
-        function promptForUserId() {
-            return prompt("Please enter your user ID:", "");
-        }
-
-        // Function to establish WebSocket connection with the provided user ID
-        function connectToWebSocket() {
-            userId = promptForUserId(); // Prompt user for user ID
-            if (!userId) {
-                alert("User ID cannot be empty!");
-                return;
-            }
-
-            socket = new WebSocket("ws://abcd12345.hbap.adroot.hsb:8080/image-stream?userId=" + userId);
-
-            socket.onmessage = function(event) {
-                const now = Date.now();
-                const timeSinceLastUpdate = now - lastImageUpdateTime;
-
-                if (timeSinceLastUpdate >= minimumDisplayTime) {
-                    updateImage(event.data);
-                } else {
-                    setTimeout(() => {
-                        updateImage(event.data);
-                    }, minimumDisplayTime - timeSinceLastUpdate);
-                }
-            };
-
-            socket.onopen = function() {
-                console.log("Connected to the server");
-            };
-
-            socket.onclose = function() {
-                console.log("Disconnected from the server, attempting to reconnect...");
-                setTimeout(connectToWebSocket, reconnectInterval); // Attempt to reconnect after a delay
-            };
-
-            socket.onerror = function(error) {
-                console.error("WebSocket error:", error);
-            };
-        }
-
-        function updateImage(base64Data) {
+        socket.onmessage = function(event) {
             const imageElement = document.getElementById("live-image");
-            imageElement.src = 'data:image/png;base64,' + base64Data; // Ensure correct MIME type
-            lastImageUpdateTime = Date.now();
-        }
+            imageElement.src = 'data:image/png;base64,' + event.data;
+        };
 
-        // Connect to WebSocket when the page loads
-        window.onload = connectToWebSocket;
+        socket.onopen = function() {
+            console.log("Connected to the server");
+        };
+
+        socket.onclose = function() {
+            console.log("Disconnected from the server");
+        };
+
+        socket.onerror = function(error) {
+            console.error("WebSocket error:", error);
+        };
     </script>
 </body>
 </html>
