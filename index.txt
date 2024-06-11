@@ -1,50 +1,123 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Live Image Stream</title>
-    <style>
-        #image-container {
-            width: 80%;  /* Adjust as needed */
-            height: 80vh;  /* Adjust as needed */
-            margin: auto;
-            border: 1px solid #ccc;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
+
+public class ImageWebSocketHandler extends TextWebSocketHandler {
+
+    private static final String DATA_FOLDER = "./Data";
+    private static final Logger LOGGER = Logger.getLogger(ImageWebSocketHandler.class.getName());
+    private static final int MAX_RETRIES = 5;
+    private static final int RETRY_DELAY_MS = 200; // 200 milliseconds
+    private final Map<String, List<String>> userImages = new ConcurrentHashMap<>();
+    private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
+
+    public ImageWebSocketHandler() {
+        loadInitialUserImages();
+    }
+
+    private void loadInitialUserImages() {
+        try {
+            Files.list(Paths.get(DATA_FOLDER))
+                .filter(Files::isDirectory)
+                .forEach(userDir -> {
+                    String userId = userDir.getFileName().toString();
+                    userImages.put(userId, new ArrayList<>());
+                    try {
+                        Files.list(userDir)
+                            .filter(Files::isRegularFile)
+                            .map(Path::toString)
+                            .sorted()
+                            .forEach(imagePath -> userImages.get(userId).add(imagePath));
+                    } catch (IOException e) {
+                        LOGGER.severe("Error loading images for user " + userId + ": " + e.getMessage());
+                    }
+                });
+        } catch (IOException e) {
+            LOGGER.severe("Error loading initial user directories: " + e.getMessage());
         }
+    }
 
-        #live-image {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
+    @Override
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        super.afterConnectionEstablished(session);
+        String userId = getUserIdFromSession(session);
+        userSessions.put(userId, session);
+        sendInitialImages(session, userId);
+        watchUserFolder(userId, session);
+    }
+
+    private String getUserIdFromSession(WebSocketSession session) {
+        // Assume user ID is passed as a query parameter
+        String query = session.getUri().getQuery();
+        return query != null && query.startsWith("userId=") ? query.substring(7) : "defaultUser";
+    }
+
+    private void sendInitialImages(WebSocketSession session, String userId) {
+        List<String> images = userImages.get(userId);
+        if (images != null) {
+            for (String imageFile : images) {
+                sendImageWithRetry(session, imageFile);
+            }
         }
-    </style>
-</head>
-<body>
-    <div id="image-container">
-        <img id="live-image" alt="Live Stream"/>
-    </div>
-    <script>
-        const socket = new WebSocket("ws://localhost:8080/image-stream");
+    }
 
-        socket.onmessage = function(event) {
-            console.log("Received message:", event.data); // Log received data
-            const imageElement = document.getElementById("live-image");
-            imageElement.src = 'data:image/png;base64,' + event.data; // Ensure correct MIME type
-        };
+    private void watchUserFolder(String userId, WebSocketSession session) {
+        try {
+            Path userFolderPath = Paths.get(DATA_FOLDER, userId);
+            WatchService watchService = FileSystems.getDefault().newWatchService();
+            userFolderPath.register(watchService, StandardWatchEventKinds.ENTRY_CREATE);
 
-        socket.onopen = function() {
-            console.log("Connected to the server");
-        };
+            new Thread(() -> {
+                while (true) {
+                    WatchKey key;
+                    try {
+                        key = watchService.take();
+                    } catch (InterruptedException e) {
+                        return;
+                    }
 
-        socket.onclose = function() {
-            console.log("Disconnected from the server");
-        };
+                    for (WatchEvent<?> event : key.pollEvents()) {
+                        WatchEvent.Kind<?> kind = event.kind();
 
-        socket.onerror = function(error) {
-            console.error("WebSocket error:", error);
-        };
-    </script>
-</body>
-</html>
+                        if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
+                            Path filePath = ((WatchEvent<Path>) event).context();
+                            String fullPath = userFolderPath.resolve(filePath).toString();
+                            userImages.get(userId).add(fullPath);
+                            sendImageWithRetry(session, fullPath);
+                        }
+                    }
+                    key.reset();
+                }
+            }).start();
+        } catch (IOException e) {
+            LOGGER.severe("Error watching folder for user " + userId + ": " + e.getMessage());
+        }
+    }
+
+    private void sendImageWithRetry(WebSocketSession session, String filePath) {
+        int retries = 0;
+        while (retries < MAX_RETRIES) {
+            try {
+                byte[] imageBytes = Files.readAllBytes(Paths.get(filePath));
+                String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+                session.sendMessage(new TextMessage(base64Image));
+                break;
+            } catch (IOException e) {
+                retries++;
+                LOGGER.warning("Error reading file, retrying (" + retries + "/" + MAX_RETRIES + "): " + e.getMessage());
+                try {
+                    Thread.sleep(RETRY_DELAY_MS);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    LOGGER.severe("Thread interrupted: " + ie.getMessage());
+                }
+            }
+        }
+    }
+}
