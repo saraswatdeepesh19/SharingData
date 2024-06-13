@@ -18,10 +18,24 @@
         const sessionID = 'your_session_id'; // Replace with the actual session ID
         const updateInterval = 100; // Update interval in milliseconds
 
-        function updateFrame() {
+        async function imageExists(url) {
+            try {
+                const response = await fetch(url, { method: 'HEAD' });
+                return response.ok;
+            } catch (error) {
+                console.error('Error checking image existence:', error);
+                return false;
+            }
+        }
+
+        async function updateFrame() {
             const frame = document.getElementById('frame');
-            frame.src = `http://localhost:8080/data/${sessionID}/test(${frameIndex}).png?timestamp=${new Date().getTime()}`;
-            frameIndex++;
+            const newImageUrl = `http://localhost:8080/data/${sessionID}/test(${frameIndex}).png?timestamp=${new Date().getTime()}`;
+            
+            if (await imageExists(newImageUrl)) {
+                frame.src = newImageUrl;
+                frameIndex++;
+            }
         }
 
         setInterval(updateFrame, updateInterval);
