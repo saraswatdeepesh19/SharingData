@@ -1,29 +1,30 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Live Image Stream</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Video Stream</title>
+    <style>
+        #frame {
+            width: 100%;
+            height: auto;
+        }
+    </style>
 </head>
 <body>
-    <img id="live-image" alt="Live Stream"/>
+    <img id="frame" src="" alt="Live Stream">
     <script>
-        const socket = new WebSocket("ws://localhost:8080/image-stream");
+        let frameIndex = 0;
+        const sessionID = 'your_session_id'; // Replace with the actual session ID
+        const updateInterval = 100; // Update interval in milliseconds
 
-        socket.onmessage = function(event) {
-            const imageElement = document.getElementById("live-image");
-            imageElement.src = 'data:image/png;base64,' + event.data;
-        };
+        function updateFrame() {
+            const frame = document.getElementById('frame');
+            frame.src = `http://localhost:8080/data/${sessionID}/test(${frameIndex}).png?timestamp=${new Date().getTime()}`;
+            frameIndex++;
+        }
 
-        socket.onopen = function() {
-            console.log("Connected to the server");
-        };
-
-        socket.onclose = function() {
-            console.log("Disconnected from the server");
-        };
-
-        socket.onerror = function(error) {
-            console.error("WebSocket error:", error);
-        };
+        setInterval(updateFrame, updateInterval);
     </script>
 </body>
 </html>
