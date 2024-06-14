@@ -6,8 +6,9 @@
     <title>Live Video Stream</title>
     <style>
         #frame {
-            width: 100%;
-            height: auto;
+            width: 640px; /* Set your desired width */
+            height: 480px; /* Set your desired height */
+            object-fit: cover; /* Adjusts the image to cover the entire frame */
         }
     </style>
 </head>
@@ -15,8 +16,19 @@
     <img id="frame" src="" alt="Live Stream">
     <script>
         let frameIndex = 0;
-        const sessionID = 'your_session_id'; // Replace with the actual session ID
+        let retryCount = 0;
+        const maxRetries = 3;
         const updateInterval = 100; // Update interval in milliseconds
+        let sessionID = '';
+
+        // Prompt the user for the session ID
+        function getSessionID() {
+            sessionID = prompt('Please enter your session ID:');
+            if (!sessionID) {
+                alert('Session ID is required!');
+                getSessionID();
+            }
+        }
 
         async function imageExists(url) {
             try {
@@ -29,16 +41,31 @@
         }
 
         async function updateFrame() {
+            if (!sessionID) {
+                return;
+            }
             const frame = document.getElementById('frame');
             const newImageUrl = `http://localhost:8080/data/${sessionID}/test(${frameIndex}).png?timestamp=${new Date().getTime()}`;
             
             if (await imageExists(newImageUrl)) {
                 frame.src = newImageUrl;
                 frameIndex++;
+                retryCount = 0; // Reset retry count on successful load
+            } else {
+                retryCount++;
+                if (retryCount >= 2 && retryCount <= maxRetries) {
+                    console.log(`Retry ${retryCount}... waiting for 2 seconds`);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+                if (retryCount > maxRetries) {
+                    console.log('Max retries reached. Stopping execution.');
+                    clearInterval(intervalId);
+                }
             }
         }
 
-        setInterval(updateFrame, updateInterval);
+        getSessionID();
+        const intervalId = setInterval(updateFrame, updateInterval);
     </script>
 </body>
 </html>
