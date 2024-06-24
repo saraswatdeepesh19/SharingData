@@ -1,10 +1,9 @@
-eventSource.onmessage = function(event) {
-            // Debug: Log the received data
-            console.log('Received data:', event.data);
+console.log('Received data:', event.data);
 
             // Check if the data is properly prefixed
             if (!event.data.startsWith('data:image/png;base64,')) {
                 console.error('Invalid image data:', event.data);
+                document.getElementById('fallback').innerText = 'Invalid image data received.';
                 return;
             }
 
@@ -17,11 +16,17 @@ eventSource.onmessage = function(event) {
             img.style.maxWidth = '100%';
             img.style.margin = '10px 0';
 
+            img.onerror = function() {
+                console.error('Failed to load image:', event.data);
+                document.getElementById('fallback').innerText = 'Failed to load image.';
+            };
+
             imageContainer.appendChild(img);
         };
 
         eventSource.onerror = function(error) {
             console.error('Error: ', error);
+            document.getElementById('fallback').innerText = 'Error receiving event stream.';
             eventSource.close();
         };
     </script>
