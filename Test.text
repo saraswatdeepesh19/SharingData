@@ -1,1 +1,51 @@
-ffmpeg -f gdigrab -framerate 30 -i desktop -c:v libx264 -b:v 3000k -f flv rtmp://your.streaming.server/live/streamkey
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import reactor.core.publisher.Flux;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.util.stream.BaseStream;
+import java.util.stream.Stream;
+
+@Controller
+@RequestMapping("/sse")
+public class ImageSseController {
+
+    @Value("${images.base.path}")
+    private String imagesBasePath;
+
+    private final ResourceLoader resourceLoader;
+
+    public ImageSseController(ResourceLoader resourceLoader) {
+        this.resourceLoader = resourceLoader;
+    }
+
+    @GetMapping("/images/{sessionId}")
+    public Flux<ServerSentEvent<Resource>> streamImages(@PathVariable String sessionId) {
+        Path imagesPath = Paths.get(imagesBasePath, sessionId, "images");
+
+        if (!Files.exists(imagesPath) || !Files.isDirectory(imagesPath)) {
+            return Flux.error(new RuntimeException("Session ID or image folder not found"));
+        }
+
+        try (Stream<Path> paths = Files.list(imagesPath)) {
+            Flux<Path> imagePathsFlux = Flux.fromStream(paths);
+
+            return imagePathsFlux
+                .delayElements(Duration.ofSeconds(1))
+                .map(path -> ServerSentEvent.builder(resourceLoader.getResource("file:" + path.toString()))
+                        .event("image")
+                        .build());
+        } catch (Exception e) {
+            return Flux.error(new RuntimeException("Error reading image files", e));
+        }
+    }
+}
