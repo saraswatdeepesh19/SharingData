@@ -1,16 +1,17 @@
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.Base64Utils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -32,8 +33,8 @@ public class ImageSseController {
         this.resourceLoader = resourceLoader;
     }
 
-    @GetMapping("/images/{sessionId}")
-    public Flux<ServerSentEvent<Resource>> streamImages(@PathVariable String sessionId) {
+    @GetMapping(value = "/images/{sessionId}", produces = "text/event-stream")
+    public Flux<ServerSentEvent<String>> streamImages(@PathVariable String sessionId) {
         Path imagesPath = Paths.get(imagesBasePath, sessionId, "images");
 
         if (!Files.exists(imagesPath) || !Files.isDirectory(imagesPath)) {
@@ -44,7 +45,8 @@ public class ImageSseController {
 
         return Flux.interval(Duration.ofSeconds(1))
                 .flatMap(tick -> fetchNewImages(imagesPath, lastSentIndex))
-                .map(path -> ServerSentEvent.builder(resourceLoader.getResource("file:" + path.toString()))
+                .map(this::encodeImageToBase64)
+                .map(base64Image -> ServerSentEvent.builder(base64Image)
                         .event("image")
                         .build());
     }
@@ -78,6 +80,15 @@ public class ImageSseController {
             return Long.parseLong(fileIndexStr);
         } catch (Exception e) {
             return -1;
+        }
+    }
+
+    private String encodeImageToBase64(Path imagePath) {
+        try {
+            byte[] imageBytes = Files.readAllBytes(imagePath);
+            return "data:image/png;base64," + Base64Utils.encodeToString(imageBytes);
+        } catch (IOException e) {
+            throw new RuntimeException("Error encoding image to Base64", e);
         }
     }
 }
