@@ -7,12 +7,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.IOException;
+import java.nio.file.*;
 import java.time.Duration;
-import java.util.stream.BaseStream;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Controller
@@ -36,16 +40,44 @@ public class ImageSseController {
             return Flux.error(new RuntimeException("Session ID or image folder not found"));
         }
 
-        try (Stream<Path> paths = Files.list(imagesPath)) {
-            Flux<Path> imagePathsFlux = Flux.fromStream(paths);
+        AtomicLong lastSentIndex = new AtomicLong(0);
 
-            return imagePathsFlux
-                .delayElements(Duration.ofSeconds(1))
+        return Flux.interval(Duration.ofSeconds(1))
+                .flatMap(tick -> fetchNewImages(imagesPath, lastSentIndex))
                 .map(path -> ServerSentEvent.builder(resourceLoader.getResource("file:" + path.toString()))
                         .event("image")
                         .build());
-        } catch (Exception e) {
+    }
+
+    private Flux<Path> fetchNewImages(Path imagesPath, AtomicLong lastSentIndex) {
+        try (Stream<Path> paths = Files.list(imagesPath)) {
+            List<Path> sortedPaths = paths
+                    .filter(Files::isRegularFile)
+                    .sorted(Comparator.comparingLong(this::getFileIndex))
+                    .collect(Collectors.toList());
+
+            List<Path> newImages = new ArrayList<>();
+            for (Path path : sortedPaths) {
+                long currentIndex = getFileIndex(path);
+                if (currentIndex > lastSentIndex.get()) {
+                    newImages.add(path);
+                    lastSentIndex.set(currentIndex);
+                }
+            }
+
+            return Flux.fromIterable(newImages);
+        } catch (IOException e) {
             return Flux.error(new RuntimeException("Error reading image files", e));
+        }
+    }
+
+    private long getFileIndex(Path path) {
+        try {
+            String fileName = path.getFileName().toString();
+            String fileIndexStr = fileName.split("\\.")[0];
+            return Long.parseLong(fileIndexStr);
+        } catch (Exception e) {
+            return -1;
         }
     }
 }
