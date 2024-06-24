@@ -1,19 +1,22 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Image Stream</title>
-</head>
-<body>
-    <div id="images"></div>
+eventSource.onmessage = function(event) {
+            // Debug: Log the received data
+            console.log('Received data:', event.data);
 
-    <script>
-        const eventSource = new EventSource('/sse/images/YOUR_SESSION_ID');
+            // Check if the data is properly prefixed
+            if (!event.data.startsWith('data:image/png;base64,')) {
+                console.error('Invalid image data:', event.data);
+                return;
+            }
 
-        eventSource.onmessage = function(event) {
             const imageContainer = document.getElementById('images');
             const img = document.createElement('img');
             img.src = event.data;
+
+            // Add some basic styling to ensure images are visible
+            img.style.display = 'block';
+            img.style.maxWidth = '100%';
+            img.style.margin = '10px 0';
+
             imageContainer.appendChild(img);
         };
 
