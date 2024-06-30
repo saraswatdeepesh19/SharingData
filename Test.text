@@ -1,34 +1,78 @@
-console.log('Received data:', event.data);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Image Stream with Canvas</title>
+</head>
+<body>
+    <canvas id="imageCanvas" style="border: 1px solid black;"></canvas>
+    <div id="fallback" style="color: red;"></div>
+    <button id="closeButton">Close Connection</button>
 
-            // Check if the data is properly prefixed
+    <script>
+        // Prompt user for session ID on page load
+        const sessionId = prompt('Please enter your session ID:');
+
+        if (!sessionId) {
+            document.getElementById('fallback').innerText = 'Session ID is required to start the stream.';
+            throw new Error('Session ID is required to start the stream.');
+        }
+
+        const eventSource = new EventSource(`/sse/images/${sessionId}`);
+
+        const canvas = document.getElementById('imageCanvas');
+        const ctx = canvas.getContext('2d');
+        const closeButton = document.getElementById('closeButton');
+
+        eventSource.onmessage = function(event) {
+            console.log('Received data:', event.data);
+
             if (!event.data.startsWith('data:image/png;base64,')) {
                 console.error('Invalid image data:', event.data);
                 document.getElementById('fallback').innerText = 'Invalid image data received.';
                 return;
             }
 
-            const imageContainer = document.getElementById('images');
-            const img = document.createElement('img');
-            img.src = event.data;
-
-            // Add some basic styling to ensure images are visible
-            img.style.display = 'block';
-            img.style.maxWidth = '100%';
-            img.style.margin = '10px 0';
-
+            const img = new Image();
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+            };
             img.onerror = function() {
                 console.error('Failed to load image:', event.data);
                 document.getElementById('fallback').innerText = 'Failed to load image.';
             };
-
-            imageContainer.appendChild(img);
+            img.src = event.data;
         };
 
         eventSource.onerror = function(error) {
-            console.error('Error: ', error);
+            console.error('Error with EventSource:', error);
             document.getElementById('fallback').innerText = 'Error receiving event stream.';
-            eventSource.close();
         };
+
+        // Log connection open
+        eventSource.onopen = function() {
+            console.log('Connection to server opened.');
+        };
+
+        // Log when connection is closed
+        eventSource.onclose = function() {
+            console.log('Connection to server closed.');
+        };
+
+        // Close the EventSource connection when the window/tab is closed or refreshed
+        window.addEventListener('beforeunload', function() {
+            eventSource.close();
+            console.log('EventSource connection closed.');
+        });
+
+        // Close the EventSource connection when the Close button is clicked
+        closeButton.addEventListener('click', function() {
+            eventSource.close();
+            console.log('EventSource connection closed.');
+            document.getElementById('fallback').innerText = 'Connection closed by user.';
+        });
     </script>
 </body>
 </html>
