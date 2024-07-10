@@ -1,53 +1,121 @@
-import lombok.Data;
-import javax.persistence.*;
-import java.sql.Timestamp;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.stereotype.Controller;
+import org.springframework.util.Base64Utils;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 
-@Data
-@Entity
-@Table(name = "APPLICATION_DETAILS")
-public class ApplicationDetails {
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID", nullable = false)
-    private Long id;
+@Controller
+@RequestMapping("/sse")
+public class ImageSseController {
 
-    @Column(name = "NAME", nullable = false, length = 200)
-    private String name;
+    @Value("${images.base.path}")
+    private String imagesBasePath;
 
-    @Column(name = "URL", nullable = false, length = 250)
-    private String url;
+    private final ResourceLoader resourceLoader;
 
-    @Column(name = "SODRE")
-    private Integer sodre;
+    public ImageSseController(ResourceLoader resourceLoader) {
+        this.resourceLoader = resourceLoader;
+    }
 
-    @Column(name = "OVERALLRATING")
-    private Integer overallRating;
+    @GetMapping(value = "/images/{sessionId}", produces = "text/event-stream")
+    public Flux<ServerSentEvent<String>> streamImages(@PathVariable String sessionId) {
+        Path imagesPath = Paths.get(imagesBasePath, sessionId);
 
-    @Column(name = "ONESTAR")
-    private Integer oneStar;
+        if (!Files.exists(imagesPath) || !Files.isDirectory(imagesPath)) {
+            return Flux.error(new RuntimeException("Session ID or image folder not found"));
+        }
 
-    @Column(name = "TWOSTAR")
-    private Integer twoStar;
+        AtomicLong lastSentIndex = new AtomicLong(0);
 
-    @Column(name = "THREESTAR")
-    private Integer threeStar;
+        return fetchAllExistingImages(imagesPath, lastSentIndex)
+                .concatWith(fetchNewImages(imagesPath, lastSentIndex))
+                .map(this::encodeImageToBase64)
+                .map(base64Image -> ServerSentEvent.builder(base64Image)
+                        .event("image")
+                        .build())
+                .doOnCancel(() -> System.out.println("Client disconnected, stopping stream."))
+                .timeout(Duration.ofMinutes(1), Flux.empty())
+                .doOnComplete(() -> System.out.println("No new files for 1 minute, stopping stream."));
+    }
 
-    @Column(name = "FOURSTAR")
-    private Integer fourStar;
+    private Flux<Path> fetchAllExistingImages(Path imagesPath, AtomicLong lastSentIndex) {
+        try (Stream<Path> paths = Files.list(imagesPath)) {
+            List<Path> sortedPaths = paths
+                    .filter(Files::isRegularFile)
+                    .sorted(Comparator.comparingLong(this::getFileIndex))
+                    .collect(Collectors.toList());
 
-    @Column(name = "FIVESTAR")
-    private Integer fiveStar;
+            if (!sortedPaths.isEmpty()) {
+                lastSentIndex.set(getFileIndex(sortedPaths.get(sortedPaths.size() - 1)));
+            }
 
-    @Column(name = "TOTALRATINGCOUNT")
-    private Integer totalRatingCount;
+            return Flux.fromIterable(sortedPaths)
+                    .delayElements(Duration.ofSeconds(1));
+        } catch (IOException e) {
+            return Flux.error(new RuntimeException("Error reading image files", e));
+        }
+    }
 
-    @Column(name = "OVERALLSENTIMENTSCORE")
-    private Float overallSentimentScore;
+    private Flux<Path> fetchNewImages(Path imagesPath, AtomicLong lastSentIndex) {
+        return Flux.interval(Duration.ofSeconds(1))
+                .flatMap(tick -> {
+                    try (Stream<Path> paths = Files.list(imagesPath)) {
+                        List<Path> sortedPaths = paths
+                                .filter(Files::isRegularFile)
+                                .sorted(Comparator.comparingLong(this::getFileIndex))
+                                .collect(Collectors.toList());
 
-    @Column(name = "CREATEDON", nullable = false, updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    private Timestamp createdOn;
+                        List<Path> newImages = new ArrayList<>();
+                        for (Path path : sortedPaths) {
+                            long currentIndex = getFileIndex(path);
+                            if (currentIndex > lastSentIndex.get()) {
+                                newImages.add(path);
+                                lastSentIndex.set(currentIndex);
+                            }
+                        }
 
-    @Column(name = "CREATEDBY", length = 200)
-    private String createdBy;
+                        return Flux.fromIterable(newImages);
+                    } catch (IOException e) {
+                        return Flux.error(new RuntimeException("Error reading image files", e));
+                    }
+                })
+                .delayElements(Duration.ofSeconds(1));
+    }
+
+    private long getFileIndex(Path path) {
+        try {
+            String fileName = path.getFileName().toString();
+            String fileIndexStr = fileName.split("\\.")[0];
+            return Long.parseLong(fileIndexStr);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private String encodeImageToBase64(Path imagePath) {
+        try {
+            byte[] imageBytes = Files.readAllBytes(imagePath);
+            return "data:image/png;base64," + Base64Utils.encodeToString(imageBytes);
+        } catch (IOException e) {
+            throw new RuntimeException("Error encoding image to Base64", e);
+        }
+    }
 }
