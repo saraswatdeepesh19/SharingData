@@ -1,78 +1,53 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Image Stream with Canvas</title>
-</head>
-<body>
-    <canvas id="imageCanvas" style="border: 1px solid black;"></canvas>
-    <div id="fallback" style="color: red;"></div>
-    <button id="closeButton">Close Connection</button>
+import lombok.Data;
+import javax.persistence.*;
+import java.sql.Timestamp;
 
-    <script>
-        // Prompt user for session ID on page load
-        const sessionId = prompt('Please enter your session ID:');
+@Data
+@Entity
+@Table(name = "APPLICATION_DETAILS")
+public class ApplicationDetails {
 
-        if (!sessionId) {
-            document.getElementById('fallback').innerText = 'Session ID is required to start the stream.';
-            throw new Error('Session ID is required to start the stream.');
-        }
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "ID", nullable = false)
+    private Long id;
 
-        const eventSource = new EventSource(`/sse/images/${sessionId}`);
+    @Column(name = "NAME", nullable = false, length = 200)
+    private String name;
 
-        const canvas = document.getElementById('imageCanvas');
-        const ctx = canvas.getContext('2d');
-        const closeButton = document.getElementById('closeButton');
+    @Column(name = "URL", nullable = false, length = 250)
+    private String url;
 
-        eventSource.onmessage = function(event) {
-            console.log('Received data:', event.data);
+    @Column(name = "SODRE")
+    private Integer sodre;
 
-            if (!event.data.startsWith('data:image/png;base64,')) {
-                console.error('Invalid image data:', event.data);
-                document.getElementById('fallback').innerText = 'Invalid image data received.';
-                return;
-            }
+    @Column(name = "OVERALLRATING")
+    private Integer overallRating;
 
-            const img = new Image();
-            img.onload = function() {
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-            };
-            img.onerror = function() {
-                console.error('Failed to load image:', event.data);
-                document.getElementById('fallback').innerText = 'Failed to load image.';
-            };
-            img.src = event.data;
-        };
+    @Column(name = "ONESTAR")
+    private Integer oneStar;
 
-        eventSource.onerror = function(error) {
-            console.error('Error with EventSource:', error);
-            document.getElementById('fallback').innerText = 'Error receiving event stream.';
-        };
+    @Column(name = "TWOSTAR")
+    private Integer twoStar;
 
-        // Log connection open
-        eventSource.onopen = function() {
-            console.log('Connection to server opened.');
-        };
+    @Column(name = "THREESTAR")
+    private Integer threeStar;
 
-        // Log when connection is closed
-        eventSource.onclose = function() {
-            console.log('Connection to server closed.');
-        };
+    @Column(name = "FOURSTAR")
+    private Integer fourStar;
 
-        // Close the EventSource connection when the window/tab is closed or refreshed
-        window.addEventListener('beforeunload', function() {
-            eventSource.close();
-            console.log('EventSource connection closed.');
-        });
+    @Column(name = "FIVESTAR")
+    private Integer fiveStar;
 
-        // Close the EventSource connection when the Close button is clicked
-        closeButton.addEventListener('click', function() {
-            eventSource.close();
-            console.log('EventSource connection closed.');
-            document.getElementById('fallback').innerText = 'Connection closed by user.';
-        });
-    </script>
-</body>
-</html>
+    @Column(name = "TOTALRATINGCOUNT")
+    private Integer totalRatingCount;
+
+    @Column(name = "OVERALLSENTIMENTSCORE")
+    private Float overallSentimentScore;
+
+    @Column(name = "CREATEDON", nullable = false, updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    private Timestamp createdOn;
+
+    @Column(name = "CREATEDBY", length = 200)
+    private String createdBy;
+}
