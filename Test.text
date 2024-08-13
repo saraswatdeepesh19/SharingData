@@ -1,121 +1,98 @@
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ResourceLoader;
-import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.stereotype.Controller;
-import org.springframework.util.Base64Utils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.util.context.Context;
+Creating an approach document for implementing a talk-back feature using the Web Speech API's `SpeechSynthesisUtterance` involves outlining the project objectives, technical requirements, implementation steps, and testing strategies. Below is a detailed approach document to guide the implementation:
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+---
 
-@Controller
-@RequestMapping("/sse")
-public class ImageSseController {
+## Approach Document: Implementing a Talk-Back Feature Using Web Speech API
 
-    @Value("${images.base.path}")
-    private String imagesBasePath;
+### 1. Introduction
 
-    private final ResourceLoader resourceLoader;
+**Objective**: To implement a talk-back feature that converts text into speech on a web application. This feature aims to enhance the user experience and accessibility by providing auditory feedback.
 
-    public ImageSseController(ResourceLoader resourceLoader) {
-        this.resourceLoader = resourceLoader;
-    }
+### 2. Project Scope
 
-    @GetMapping(value = "/images/{sessionId}", produces = "text/event-stream")
-    public Flux<ServerSentEvent<String>> streamImages(@PathVariable String sessionId) {
-        Path imagesPath = Paths.get(imagesBasePath, sessionId);
+- **Target Users**: Users of the web application who prefer or require auditory content.
+- **Technologies Used**: HTML, CSS, JavaScript, jQuery, Web Speech API.
+- **Browsers Supported**: Latest versions of Chrome, Firefox, Edge, and Safari.
 
-        if (!Files.exists(imagesPath) || !Files.isDirectory(imagesPath)) {
-            return Flux.error(new RuntimeException("Session ID or image folder not found"));
-        }
+### 3. Technical Requirements
 
-        AtomicLong lastSentIndex = new AtomicLong(0);
+- **Web Speech API**: Utilize the `SpeechSynthesisUtterance` interface for text-to-speech functionality.
+- **jQuery**: For DOM manipulation and event handling.
+- **CSS**: To style the application and enhance user interface aesthetics.
+- **HTML Elements**: Button for triggering speech and container elements for the text content.
 
-        return fetchAllExistingImages(imagesPath, lastSentIndex)
-                .concatWith(fetchNewImages(imagesPath, lastSentIndex))
-                .map(this::encodeImageToBase64)
-                .map(base64Image -> ServerSentEvent.builder(base64Image)
-                        .event("image")
-                        .build())
-                .doOnCancel(() -> System.out.println("Client disconnected, stopping stream."))
-                .timeout(Duration.ofMinutes(1), Flux.empty())
-                .doOnComplete(() -> System.out.println("No new files for 1 minute, stopping stream."));
-    }
+### 4. Implementation Plan
 
-    private Flux<Path> fetchAllExistingImages(Path imagesPath, AtomicLong lastSentIndex) {
-        try (Stream<Path> paths = Files.list(imagesPath)) {
-            List<Path> sortedPaths = paths
-                    .filter(Files::isRegularFile)
-                    .sorted(Comparator.comparingLong(this::getFileIndex))
-                    .collect(Collectors.toList());
+#### 4.1 Setup HTML Structure
 
-            if (!sortedPaths.isEmpty()) {
-                lastSentIndex.set(getFileIndex(sortedPaths.get(sortedPaths.size() - 1)));
-            }
+- **Create HTML Elements**: Include a `<div>` for text content and a `<button>` to initiate the speech synthesis.
+  
+  ```html
+  <div id="text-content">
+      This is the text that will be read out loud by the TTS feature.
+  </div>
+  <button id="speak-button">Speak</button>
+  ```
 
-            return Flux.fromIterable(sortedPaths)
-                    .delayElements(Duration.ofSeconds(1));
-        } catch (IOException e) {
-            return Flux.error(new RuntimeException("Error reading image files", e));
-        }
-    }
+#### 4.2 Include Dependencies
 
-    private Flux<Path> fetchNewImages(Path imagesPath, AtomicLong lastSentIndex) {
-        return Flux.interval(Duration.ofSeconds(1))
-                .flatMap(tick -> {
-                    try (Stream<Path> paths = Files.list(imagesPath)) {
-                        List<Path> sortedPaths = paths
-                                .filter(Files::isRegularFile)
-                                .sorted(Comparator.comparingLong(this::getFileIndex))
-                                .collect(Collectors.toList());
+- **jQuery**: Link to the jQuery library in the HTML file.
+  
+  ```html
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  ```
 
-                        List<Path> newImages = new ArrayList<>();
-                        for (Path path : sortedPaths) {
-                            long currentIndex = getFileIndex(path);
-                            if (currentIndex > lastSentIndex.get()) {
-                                newImages.add(path);
-                                lastSentIndex.set(currentIndex);
-                            }
-                        }
+#### 4.3 Implement JavaScript Functionality
 
-                        return Flux.fromIterable(newImages);
-                    } catch (IOException e) {
-                        return Flux.error(new RuntimeException("Error reading image files", e));
-                    }
-                })
-                .delayElements(Duration.ofSeconds(1));
-    }
+- **Speech Synthesis Setup**: Write JavaScript to capture the text content and create a `SpeechSynthesisUtterance` instance.
 
-    private long getFileIndex(Path path) {
-        try {
-            String fileName = path.getFileName().toString();
-            String fileIndexStr = fileName.split("\\.")[0];
-            return Long.parseLong(fileIndexStr);
-        } catch (Exception e) {
-            return -1;
-        }
-    }
+  ```javascript
+  $(document).ready(function() {
+      $('#speak-button').click(function() {
+          let text = $('#text-content').text();
+          let utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'en-US';
+          window.speechSynthesis.speak(utterance);
+      });
+  });
+  ```
 
-    private String encodeImageToBase64(Path imagePath) {
-        try {
-            byte[] imageBytes = Files.readAllBytes(imagePath);
-            return "data:image/png;base64," + Base64Utils.encodeToString(imageBytes);
-        } catch (IOException e) {
-            throw new RuntimeException("Error encoding image to Base64", e);
-        }
-    }
-}
+#### 4.4 Style the Application
+
+- **CSS Styling**: Add basic styling to enhance the look and feel of the application.
+
+  ```css
+  body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+  }
+  #text-content {
+      margin-bottom: 20px;
+      font-size: 1.2em;
+  }
+  #speak-button {
+      padding: 10px 20px;
+      font-size: 1em;
+      cursor: pointer;
+  }
+  ```
+
+### 5. Testing Strategy
+
+- **Cross-Browser Testing**: Ensure the feature works across supported browsers.
+- **Accessibility Testing**: Verify that the feature enhances accessibility, especially for visually impaired users.
+- **Error Handling**: Test the application’s response to unsupported browsers and scenarios where speech synthesis fails.
+
+### 6. Deployment and Maintenance
+
+- **Deployment**: Integrate the feature into the main branch and deploy it to the production environment.
+- **Monitoring**: Continuously monitor user feedback and system performance.
+- **Updates**: Regularly update the implementation as new browser versions and features become available.
+
+### 7. Conclusion
+
+This talk-back feature will significantly improve the user experience and accessibility of the web application. By following the outlined implementation plan, we ensure a smooth integration and positive impact on our user base.
+
+---
+
+This document serves as a comprehensive guide for developers to implement the talk-back feature using the Web Speech API, ensuring clarity and alignment with the project goals.
