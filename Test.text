@@ -1,31 +1,20 @@
-Project: Talkback Feature Implementation
+package com.example.healthcheck.controller;
 
-Objective: Implement a talkback feature that enables an element to "talk" when a user hovers over it, using HTML, JS, CSS, and jQuery.
+import com.example.healthcheck.service.HealthCheckService;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-Requirements:
+@RestController
+public class HealthCheckController {
 
-1. Integrate speech recognition and synthesis libraries/APIs.
-2. Create a talkable element (e.g., div, button) that triggers speech output on hover.
-3. Customize speech output (text, voice, rate, pitch) as needed.
-4. Ensure compatibility with supported browsers (Chrome, Safari, Edge).
+    private final HealthCheckService healthCheckService;
 
-Technical Details:
+    public HealthCheckController(HealthCheckService healthCheckService) {
+        this.healthCheckService = healthCheckService;
+    }
 
-1. Speech Recognition:
-    - Library/API: Web Speech API, SpeechRecognition.js, or Google Cloud Speech-to-Text.
-    - Language support: English (default), with potential for additional languages.
-2. Speech Synthesis:
-    - Library/API: Web Speech API (SpeechSynthesis).
-    - Voice options: Default voice, with potential for additional voices.
-3. Event Handling:
-    - Hover event: Trigger speech output when user hovers over talkable element.
-4. Browser Support:
-    - Chrome, Safari, Edge (primary support).
-    - Firefox (limited support).
-
-Next Steps:
-
-1. Research and select suitable speech recognition and synthesis libraries/APIs.
-2. Implement talkable element and hover event handling.
-3. Customize speech output and test functionality.
-4. Ensure cross-browser compatibility.
+    @GetMapping("/services/up/count")
+    public long getUpServicesCount() {
+        return healthCheckService.countServicesUp();
+    }
+}
