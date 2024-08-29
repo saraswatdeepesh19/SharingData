@@ -1,34 +1,30 @@
-package com.example.healthcheck.service;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import java.util.List;
-
 @Service
 public class HealthCheckService {
 
-    @Value("${services.urls}")
-    private List<String> serviceUrls;
+    @Autowired
+    private ServiceHealthRepository serviceHealthRepository;
 
-    private final RestTemplate restTemplate;
+    @Autowired
+    private RestTemplate restTemplate;
 
-    public HealthCheckService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+    public ServiceHealth saveServiceHealth(ServiceHealth serviceHealth) {
+        return serviceHealthRepository.save(serviceHealth);
     }
 
-    public long countServicesUp() {
-        return serviceUrls.stream()
-                .filter(this::isServiceUp)
-                .count();
-    }
+    public List<ServiceHealthStatus> checkAllServiceHealth() {
+        List<ServiceHealth> services = serviceHealthRepository.findAll();
+        List<ServiceHealthStatus> statuses = new ArrayList<>();
 
-    private boolean isServiceUp(String url) {
-        try {
-            String healthStatus = restTemplate.getForObject(url, String.class);
-            return healthStatus != null && healthStatus.contains("\"status\":\"UP\"");
-        } catch (Exception e) {
-            return false;
+        for (ServiceHealth service : services) {
+            ResponseEntity<String> response;
+            try {
+                response = restTemplate.getForEntity(service.getHealthUrl(), String.class);
+                statuses.add(new ServiceHealthStatus(service.getServiceName(), response.getStatusCode().toString()));
+            } catch (Exception e) {
+                statuses.add(new ServiceHealthStatus(service.getServiceName(), "DOWN"));
+            }
         }
+
+        return statuses;
     }
 }
