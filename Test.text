@@ -1,22 +1,24 @@
-package com.example.repository;
+package com.example.service;
 
 import com.example.dto.DeviceDetailsDto;
-import com.example.entity.Device;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
+import com.example.dto.DeviceResponseDto;
+import com.example.repository.DeviceRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-@Repository
-public interface DeviceRepository extends JpaRepository<Device, String> {
+@Service
+public class DeviceService {
 
-    @Query("SELECT new com.example.dto.DeviceDetailsDto(d.deviceName, d.projectName, d.deviceStatus, d.type) FROM Device d")
-    List<DeviceDetailsDto> fetchDeviceDetails();
+    @Autowired
+    private DeviceRepository deviceRepository;
 
-    @Query("SELECT COUNT(d) FROM Device d WHERE d.projectName = 'SHARED'")
-    Long countSharedProjects();
+    public DeviceResponseDto getDeviceDetailsWithCounts() {
+        List<DeviceDetailsDto> devices = deviceRepository.fetchDeviceDetails();
+        Long sharedCount = deviceRepository.countSharedProjects();
+        Long nonSharedCount = deviceRepository.countNonSharedProjects();
 
-    @Query("SELECT COUNT(d) FROM Device d WHERE d.projectName <> 'SHARED'")
-    Long countNonSharedProjects();
+        return new DeviceResponseDto(devices, sharedCount, nonSharedCount);
+    }
 }
