@@ -1,30 +1,64 @@
-@Service
-public class HealthCheckService {
+package com.example.deviceapi.model;
 
-    @Autowired
-    private ServiceHealthRepository serviceHealthRepository;
+import javax.persistence.*;
 
-    @Autowired
-    private RestTemplate restTemplate;
+@Entity
+@Table(name = "devices")
+public class Device {
 
-    public ServiceHealth saveServiceHealth(ServiceHealth serviceHealth) {
-        return serviceHealthRepository.save(serviceHealth);
+    @Id
+    @Column(name = "UDID", length = 255)
+    private String udid;
+
+    @Column(name = "DEVICEPORT", precision = 38)
+    private Long devicePort;
+
+    @Column(name = "DEVICENAME", length = 255)
+    private String deviceName;
+
+    @Column(name = "DEVICESTATUS", length = 255)
+    private String deviceStatus;
+
+    @Column(name = "PLATFORMNAME", length = 255)
+    private String platformName;
+
+    @Column(name = "PLATFORMVERSION", length = 255)
+    private String platformVersion;
+
+    @Column(name = "SLAVE_IP", length = 255)
+    private String slaveIp;
+
+    @Column(name = "ISREALDEVICE", length = 1)
+    private String isRealDevice;
+
+    @Column(name = "USERID", precision = 10)
+    private Long userId;
+
+    @Column(name = "TYPE", length = 10)
+    private String type;
+
+    @Column(name = "LIVE_URL", length = 10)
+    private String liveUrl;
+
+    @Column(name = "PROJECTNAME", length = 90)
+    private String projectName;
+
+    // Getters and setters
+    public String getUdid() {
+        return udid;
     }
 
-    public List<ServiceHealthStatus> checkAllServiceHealth() {
-        List<ServiceHealth> services = serviceHealthRepository.findAll();
-        List<ServiceHealthStatus> statuses = new ArrayList<>();
-
-        for (ServiceHealth service : services) {
-            ResponseEntity<String> response;
-            try {
-                response = restTemplate.getForEntity(service.getHealthUrl(), String.class);
-                statuses.add(new ServiceHealthStatus(service.getServiceName(), response.getStatusCode().toString()));
-            } catch (Exception e) {
-                statuses.add(new ServiceHealthStatus(service.getServiceName(), "DOWN"));
-            }
-        }
-
-        return statuses;
+    public void setUdid(String udid) {
+        this.udid = udid;
     }
+
+    public String getDeviceName() {
+        return deviceName;
+    }
+
+    public void setDeviceName(String deviceName) {
+        this.deviceName = deviceName;
+    }
+
+    // Other getters and setters for remaining fields
 }
