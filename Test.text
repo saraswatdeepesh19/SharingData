@@ -1,32 +1,71 @@
-package com.example.service;
+package com.example.controller;
 
 import com.example.entity.Device;
-import com.example.repository.DeviceRepository;
+import com.example.service.DeviceService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
 
-@Service
-public class DeviceService {
+@RestController
+@RequestMapping("/api/devices")
+public class DeviceController {
 
     @Autowired
-    private DeviceRepository deviceRepository;
+    private DeviceService deviceService;
 
+    @GetMapping
     public List<Device> getAllDevices() {
-        return deviceRepository.findAll();
+        return deviceService.getAllDevices();
     }
 
-    public Optional<Device> getDeviceById(String udid) {
-        return deviceRepository.findById(udid);
+    @GetMapping("/{udid}")
+    public ResponseEntity<Device> getDeviceById(@PathVariable String udid) {
+        Optional<Device> device = deviceService.getDeviceById(udid);
+        if (device.isPresent()) {
+            return ResponseEntity.ok(device.get());
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
-    public Device saveDevice(Device device) {
-        return deviceRepository.save(device);
+    @PostMapping
+    public Device createDevice(@RequestBody Device device) {
+        return deviceService.saveDevice(device);
     }
 
-    public void deleteDeviceById(String udid) {
-        deviceRepository.deleteById(udid);
+    @PutMapping("/{udid}")
+    public ResponseEntity<Device> updateDevice(@PathVariable String udid, @RequestBody Device deviceDetails) {
+        Optional<Device> device = deviceService.getDeviceById(udid);
+        if (device.isPresent()) {
+            Device updatedDevice = device.get();
+            updatedDevice.setDevicePort(deviceDetails.getDevicePort());
+            updatedDevice.setDeviceName(deviceDetails.getDeviceName());
+            updatedDevice.setDeviceStatus(deviceDetails.getDeviceStatus());
+            updatedDevice.setPlatformName(deviceDetails.getPlatformName());
+            updatedDevice.setPlatformVersion(deviceDetails.getPlatformVersion());
+            updatedDevice.setSlaveIp(deviceDetails.getSlaveIp());
+            updatedDevice.setIsRealDevice(deviceDetails.getIsRealDevice());
+            updatedDevice.setUserId(deviceDetails.getUserId());
+            updatedDevice.setType(deviceDetails.getType());
+            updatedDevice.setLiveUrl(deviceDetails.getLiveUrl());
+            updatedDevice.setProjectName(deviceDetails.getProjectName());
+
+            return ResponseEntity.ok(deviceService.saveDevice(updatedDevice));
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/{udid}")
+    public ResponseEntity<Void> deleteDevice(@PathVariable String udid) {
+        if (deviceService.getDeviceById(udid).isPresent()) {
+            deviceService.deleteDeviceById(udid);
+            return ResponseEntity.noContent().build();
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
