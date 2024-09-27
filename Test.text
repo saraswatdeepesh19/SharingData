@@ -1,5 +1,22 @@
- @Query("SELECT new com.example.dto.DeviceCountDto(d.deviceName, d.projectName, d.deviceStatus, d.type, " +
-           "(SELECT COUNT(d2) FROM Device d2 WHERE d2.projectName = 'SHARED') AS sharedCount, " +
-           "(SELECT COUNT(d3) FROM Device d3 WHERE d3.projectName <> 'SHARED') AS nonSharedCount) " +
-           "FROM Device d")
-    List<DeviceCountDto> fetchDeviceDetailsWithCounts();
+package com.example.repository;
+
+import com.example.dto.DeviceDetailsDto;
+import com.example.entity.Device;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface DeviceRepository extends JpaRepository<Device, String> {
+
+    @Query("SELECT new com.example.dto.DeviceDetailsDto(d.deviceName, d.projectName, d.deviceStatus, d.type) FROM Device d")
+    List<DeviceDetailsDto> fetchDeviceDetails();
+
+    @Query("SELECT COUNT(d) FROM Device d WHERE d.projectName = 'SHARED'")
+    Long countSharedProjects();
+
+    @Query("SELECT COUNT(d) FROM Device d WHERE d.projectName <> 'SHARED'")
+    Long countNonSharedProjects();
+}
