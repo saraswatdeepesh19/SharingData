@@ -1,24 +1,25 @@
-package com.example.service;
+Here's a small background description:
 
-import com.example.dto.DeviceDetailsDto;
-import com.example.dto.DeviceResponseDto;
-import com.example.repository.DeviceRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
-import java.util.List;
+*Seasoned Java Backend Developer & Technical Leader*
 
-@Service
-public class DeviceService {
+Highly accomplished Java backend developer with 8+ years of experience in designing, developing, and delivering scalable, secure, and high-performance software solutions. Proven track record of leading cross-functional teams, mentoring junior developers, and driving technical innovation. Skilled in Spring Framework, microservices architecture, cloud computing, and agile methodologies.
 
-    @Autowired
-    private DeviceRepository deviceRepository;
 
-    public DeviceResponseDto getDeviceDetailsWithCounts() {
-        List<DeviceDetailsDto> devices = deviceRepository.fetchDeviceDetails();
-        Long sharedCount = deviceRepository.countSharedProjects();
-        Long nonSharedCount = deviceRepository.countNonSharedProjects();
+Or
 
-        return new DeviceResponseDto(devices, sharedCount, nonSharedCount);
-    }
-}
+
+*Technical Expert with Passion for Innovation*
+
+Results-driven Java backend developer with 8+ years of experience in crafting robust, efficient, and scalable software systems. Expertise in Java, Spring, cloud computing, and DevOps. Dedicated to staying up-to-date with industry trends and emerging technologies.
+
+
+Or
+
+
+*Java Backend Development Thought Leader*
+
+Accomplished Java backend developer and technical leader with 8+ years of experience in developing complex software solutions. Recognized expert in Java, Spring, microservices, and cloud computing. Committed to delivering high-quality solutions, mentoring teams, and driving technical excellence.
+
+
+Feel free to modify these descriptions to fit your personal brand and style.
