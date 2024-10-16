@@ -1,25 +1,30 @@
-Here's a small background description:
+# Root logger configuration
+status = warn
+name = PropertiesConfig
+property.logDir = logs
+property.logFileName = ${logDir}/application.log
 
+# Console appender
+appender.console.type = Console
+appender.console.name = Console
+appender.console.layout.type = PatternLayout
+appender.console.layout.pattern = %d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n
 
-*Seasoned Java Backend Developer & Technical Leader*
+# File appender (writing logs to the 'logs/application.log' file)
+appender.file.type = File
+appender.file.name = LogFile
+appender.file.fileName = ${logFileName}
+appender.file.layout.type = PatternLayout
+appender.file.layout.pattern = %d %p %c [%t] %m%n
 
-Highly accomplished Java backend developer with 8+ years of experience in designing, developing, and delivering scalable, secure, and high-performance software solutions. Proven track record of leading cross-functional teams, mentoring junior developers, and driving technical innovation. Skilled in Spring Framework, microservices architecture, cloud computing, and agile methodologies.
+# Root logger configuration (INFO level)
+rootLogger.level = info
+rootLogger.appenderRefs = console, file
+rootLogger.appenderRef.console.ref = Console
+rootLogger.appenderRef.file.ref = LogFile
 
+# Set logging level for specific packages
+logger.org.springframework.boot.autoconfigure.level = info
 
-Or
-
-
-*Technical Expert with Passion for Innovation*
-
-Results-driven Java backend developer with 8+ years of experience in crafting robust, efficient, and scalable software systems. Expertise in Java, Spring, cloud computing, and DevOps. Dedicated to staying up-to-date with industry trends and emerging technologies.
-
-
-Or
-
-
-*Java Backend Development Thought Leader*
-
-Accomplished Java backend developer and technical leader with 8+ years of experience in developing complex software solutions. Recognized expert in Java, Spring, microservices, and cloud computing. Committed to delivering high-quality solutions, mentoring teams, and driving technical excellence.
-
-
-Feel free to modify these descriptions to fit your personal brand and style.
+# Suppress debug-level logs from Spring Boot's autoconfiguration
+logger.org.springframework.level = info
