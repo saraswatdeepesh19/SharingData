@@ -1,30 +1,83 @@
-# Root logger configuration
-status = warn
-name = PropertiesConfig
-property.logDir = logs
-property.logFileName = ${logDir}/application.log
+Document Title:
+Digital Platform Monitoring Onboarding Evidence: Grafana and AppDynamics
 
-# Console appender
-appender.console.type = Console
-appender.console.name = Console
-appender.console.layout.type = PatternLayout
-appender.console.layout.pattern = %d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n
+1. Introduction
+This document outlines the successful onboarding of the Digital Platform onto Grafana and AppDynamics. It provides evidence of monitoring setup for platform services, logs, and infrastructure.
 
-# File appender (writing logs to the 'logs/application.log' file)
-appender.file.type = File
-appender.file.name = LogFile
-appender.file.fileName = ${logFileName}
-appender.file.layout.type = PatternLayout
-appender.file.layout.pattern = %d %p %c [%t] %m%n
+2. Objectives
+The objective of this onboarding is to:
 
-# Root logger configuration (INFO level)
-rootLogger.level = info
-rootLogger.appenderRefs = console, file
-rootLogger.appenderRef.console.ref = Console
-rootLogger.appenderRef.file.ref = LogFile
+Ensure real-time monitoring of all platform services and infrastructure.
+Track and analyze logs for performance optimization and troubleshooting.
+Provide visibility into key metrics for service health and performance using Grafana and AppDynamics.
+3. Monitoring Tools Overview
+3.1 Grafana
+Grafana is an open-source platform used for monitoring and observability. It provides a unified interface to visualize metrics, logs, and traces. The platform's data can be collected from various sources like Prometheus, Elasticsearch, and more.
 
-# Set logging level for specific packages
-logger.org.springframework.boot.autoconfigure.level = info
+3.2 AppDynamics
+AppDynamics is a performance management solution that provides detailed insights into application performance, infrastructure, and end-user behavior. It allows real-time monitoring, anomaly detection, and deep diagnostics.
 
-# Suppress debug-level logs from Spring Boot's autoconfiguration
-logger.org.springframework.level = info
+4. Onboarding Overview
+4.1 Grafana Onboarding
+Data Sources Integrated:
+
+Prometheus (for service metrics)
+Loki (for log aggregation)
+CloudWatch (for AWS infrastructure metrics)
+Dashboards Created:
+
+Services Overview Dashboard: Real-time health and performance of all platform services.
+Infrastructure Dashboard: Monitoring CPU, memory, and disk usage of servers.
+Log Analytics Dashboard: Aggregated logs from services for error detection.
+Sample Evidence (Screenshots):
+
+Service Dashboard: (Insert screenshot of the Grafana service dashboard here)
+Infrastructure Dashboard: (Insert screenshot of the infrastructure dashboard here)
+Log Analytics: (Insert screenshot of log monitoring and alerts setup here)
+4.2 AppDynamics Onboarding
+Services Monitored:
+
+Backend APIs
+Frontend Applications
+Database Performance
+Infrastructure Monitored:
+
+AWS EC2 instances
+Containers (Docker/Kubernetes)
+Alerts Configured:
+
+CPU Utilization > 80%
+API Response Time > 2 seconds
+Memory Utilization > 85%
+Sample Evidence (Screenshots):
+
+AppDynamics Dashboard: (Insert screenshot of the AppDynamics monitoring dashboard for services and infrastructure)
+Alert Configuration: (Insert screenshot of alert policies and configurations)
+Detailed Application Performance: (Insert screenshot showing an application's performance insights)
+5. Log Monitoring and Aggregation
+5.1 Log Sources
+Application logs
+System logs
+Error and exception logs
+5.2 Tools Used
+Grafana (via Loki): Aggregated logs across microservices for real-time querying.
+AppDynamics: Deep diagnostics and root cause analysis based on application logs.
+5.3 Evidence (Screenshots):
+Log Monitoring: (Insert screenshot of log queries in Grafana and error detection)
+6. Alerts and Notifications
+6.1 Grafana Alerts
+Metrics-based alerting on service health and infrastructure usage.
+Sample alerts: Memory usage above 85%, service downtime detected.
+6.2 AppDynamics Alerts
+Alerting based on performance anomalies and infrastructure health.
+Sample alerts: High response times, CPU or memory spikes.
+6.3 Evidence of Alert Configuration (Screenshots):
+(Insert screenshot of Grafana alert setup)
+(Insert screenshot of AppDynamics alert setup)
+7. Conclusion
+The Digital Platform has been successfully onboarded onto Grafana and AppDynamics for comprehensive monitoring. This setup ensures the platform's reliability, scalability, and performance, while providing detailed insights into infrastructure health and service performance.
+
+8. Appendix (Optional)
+Links to Dashboards: (if applicable, provide links to live Grafana or AppDynamics dashboards)
+Additional Resources: Links to documentation, configurations, and other resources.
+This structured document, along with screenshots and proper descriptions of each onboarding step, will provide solid evidence of the Digital Platform’s monitoring capabilities.
