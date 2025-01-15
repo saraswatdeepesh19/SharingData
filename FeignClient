@@ -1,40 +1,31 @@
-package com.hsbc.QEP.digitalplatform.feature_toggle_service.controller;
-
-import com.hsbc.QEP.digitalplatform.feature_toggle_service.entity.Features;
-import com.hsbc.QEP.digitalplatform.feature_toggle_service.exception.FeatureNotFoundException;
-import com.hsbc.QEP.digitalplatform.feature_toggle_service.service.FeaturesService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-@RestController
-@RequestMapping("/api/features")
-public class FeaturesController {
+@Service
+public class FeaturesService {
 
     @Autowired
-    private FeaturesService featuresService;
+    private FeaturesRepository featuresRepository;
 
     /**
      * Add a new feature.
      *
      * @param feature the feature to be added
-     * @return ResponseEntity with success message
      */
-    @PostMapping("/add")
-    public ResponseEntity<String> addFeature(@RequestBody Features feature) {
-        featuresService.addFeature(feature);
-        return ResponseEntity.ok("Feature added successfully!");
+    public void addFeature(Features feature) {
+        if (featuresRepository.existsByFeatureName(feature.getFeatureName())) {
+            throw new FeatureAlreadyExistsException("Feature with the name '" + feature.getFeatureName() + "' already exists!");
+        }
+        featuresRepository.save(feature);
     }
 
     /**
      * Remove a feature by name.
      *
      * @param featureName the name of the feature to remove
-     * @return ResponseEntity with success message
      */
-    @DeleteMapping("/remove/{featureName}")
-    public ResponseEntity<String> removeFeature(@PathVariable String featureName) {
-        featuresService.removeFeature(featureName);
-        return ResponseEntity.ok("Feature removed successfully!");
+    public void removeFeature(String featureName) {
+        Features feature = featuresRepository.findByFeatureName(featureName);
+        if (feature == null) {
+            throw new FeatureNotFoundException("Feature with the name '" + featureName + "' not found!");
+        }
+        featuresRepository.delete(feature);
     }
 }
