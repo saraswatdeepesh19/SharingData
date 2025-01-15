@@ -1,13 +1,40 @@
-private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+package com.hsbc.QEP.digitalplatform.feature_toggle_service.controller;
 
-    public void startTask() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                // Call your method here
-            }
-        }, 0, 10, TimeUnit.SECONDS);
+import com.hsbc.QEP.digitalplatform.feature_toggle_service.entity.Features;
+import com.hsbc.QEP.digitalplatform.feature_toggle_service.exception.FeatureNotFoundException;
+import com.hsbc.QEP.digitalplatform.feature_toggle_service.service.FeaturesService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/features")
+public class FeaturesController {
+
+    @Autowired
+    private FeaturesService featuresService;
+
+    /**
+     * Add a new feature.
+     *
+     * @param feature the feature to be added
+     * @return ResponseEntity with success message
+     */
+    @PostMapping("/add")
+    public ResponseEntity<String> addFeature(@RequestBody Features feature) {
+        featuresService.addFeature(feature);
+        return ResponseEntity.ok("Feature added successfully!");
     }
 
-    public void stopTask() {
-        scheduler.shutdown();
+    /**
+     * Remove a feature by name.
+     *
+     * @param featureName the name of the feature to remove
+     * @return ResponseEntity with success message
+     */
+    @DeleteMapping("/remove/{featureName}")
+    public ResponseEntity<String> removeFeature(@PathVariable String featureName) {
+        featuresService.removeFeature(featureName);
+        return ResponseEntity.ok("Feature removed successfully!");
     }
+}
