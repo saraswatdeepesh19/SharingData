@@ -1,7 +1,7 @@
 package com.hsbc.QEP.digitalplatform.feature_toggle_service.exception;
 
-public class FeatureAlreadyExistsException extends RuntimeException {
-    public FeatureAlreadyExistsException(String message) {
+public class FeatureNotFoundException extends RuntimeException {
+    public FeatureNotFoundException(String message) {
         super(message);
     }
 }
