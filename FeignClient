@@ -1,25 +1,11 @@
-package com.hsbc.QEP.digitalplatform.feature_toggle_service.exception;
+package com.hsbc.QEP.digitalplatform.feature_toggle_service.repository;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
+import com.hsbc.QEP.digitalplatform.feature_toggle_service.entity.Features;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(FeatureAlreadyExistsException.class)
-    public ResponseEntity<String> handleFeatureAlreadyExistsException(FeatureAlreadyExistsException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
-    }
-
-    @ExceptionHandler(FeatureNotFoundException.class)
-    public ResponseEntity<String> handleFeatureNotFoundException(FeatureNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
-    }
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<String> handleGenericException(Exception ex) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
-    }
+@Repository
+public interface FeaturesRepository extends JpaRepository<Features, Long> {
+    boolean existsByFeatureName(String featureName);
+    Features findByFeatureName(String featureName);
 }
