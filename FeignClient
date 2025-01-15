@@ -1,31 +1,7 @@
-@Service
-public class FeaturesService {
+package com.hsbc.QEP.digitalplatform.feature_toggle_service.exception;
 
-    @Autowired
-    private FeaturesRepository featuresRepository;
-
-    /**
-     * Add a new feature.
-     *
-     * @param feature the feature to be added
-     */
-    public void addFeature(Features feature) {
-        if (featuresRepository.existsByFeatureName(feature.getFeatureName())) {
-            throw new FeatureAlreadyExistsException("Feature with the name '" + feature.getFeatureName() + "' already exists!");
-        }
-        featuresRepository.save(feature);
-    }
-
-    /**
-     * Remove a feature by name.
-     *
-     * @param featureName the name of the feature to remove
-     */
-    public void removeFeature(String featureName) {
-        Features feature = featuresRepository.findByFeatureName(featureName);
-        if (feature == null) {
-            throw new FeatureNotFoundException("Feature with the name '" + featureName + "' not found!");
-        }
-        featuresRepository.delete(feature);
+public class FeatureAlreadyExistsException extends RuntimeException {
+    public FeatureAlreadyExistsException(String message) {
+        super(message);
     }
 }
