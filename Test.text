@@ -1,21 +1,14 @@
 SELECT 
-    browser, 
-    version, 
-    SUM(CASE WHEN TO_CHAR(starttime, 'YYYY-MM') = '2024-01' THEN usage ELSE 0 END) AS jan_2024,
-    SUM(CASE WHEN TO_CHAR(starttime, 'YYYY-MM') = '2024-02' THEN usage ELSE 0 END) AS feb_2024,
-    SUM(CASE WHEN TO_CHAR(starttime, 'YYYY-MM') = '2024-03' THEN usage ELSE 0 END) AS mar_2024,
-    SUM(CASE WHEN TO_CHAR(starttime, 'YYYY-MM') = '2024-04' THEN usage ELSE 0 END) AS apr_2024,
-    SUM(CASE WHEN TO_CHAR(starttime, 'YYYY-MM') = '2024-05' THEN usage ELSE 0 END) AS may_2024,
-    SUM(CASE WHEN TO_CHAR(starttime, 'YYYY-MM') = '2024-06' THEN usage ELSE 0 END) AS jun_2024,
-    SUM(CASE WHEN TO_CHAR(starttime, 'YYYY-MM') = '2024-07' THEN usage ELSE 0 END) AS jul_2024,
-    SUM(CASE WHEN TO_CHAR(starttime, 'YYYY-MM') = '2024-08' THEN usage ELSE 0 END) AS aug_2024,
-    SUM(CASE WHEN TO_CHAR(starttime, 'YYYY-MM') = '2024-09' THEN usage ELSE 0 END) AS sep_2024
-FROM 
-    usagever
-WHERE 
-    TRUNC(starttime) BETWEEN TO_DATE('2024-01-01', 'yyyy-mm-dd') 
-    AND TO_DATE('2024-09-30', 'yyyy-mm-dd')
-GROUP BY 
-    browser, version
-ORDER BY 
-    SUM(usage);
+    COALESCE(b_live.browsername, u.browsername) AS browsername,
+    COALESCE(b_live.version, u.version) AS version,
+    SUM(u.usage) AS total_usage
+FROM usagever u
+LEFT JOIN browsers b 
+    ON u.browsername = b.browsername 
+    AND u.version = b.version
+LEFT JOIN browsers b_live 
+    ON u.browsername = b_live.browsername 
+    AND u.version || '_live' = b_live.version
+WHERE u.psid = :userId 
+AND u.date BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD') AND TO_DATE(:endDate, 'YYYY-MM-DD')
+GROUP BY COALESCE(b_live.browsername, u.browsername), COALESCE(b_live.version, u.version);
