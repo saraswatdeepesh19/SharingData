@@ -1,14 +1,26 @@
-SELECT 
-    COALESCE(b_live.browsername, u.browsername) AS browsername,
-    COALESCE(b_live.version, u.version) AS version,
-    SUM(u.usage) AS total_usage
-FROM usagever u
-LEFT JOIN browsers b 
-    ON u.browsername = b.browsername 
-    AND u.version = b.version
-LEFT JOIN browsers b_live 
-    ON u.browsername = b_live.browsername 
-    AND u.version || '_live' = b_live.version
-WHERE u.psid = :userId 
-AND u.date BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD') AND TO_DATE(:endDate, 'YYYY-MM-DD')
-GROUP BY COALESCE(b_live.browsername, u.browsername), COALESCE(b_live.version, u.version);
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: C:\promtail\positions.yaml
+
+clients:
+  - url: http://<LOKI-HOST>:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: windows-services-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: windows-services
+          __path__: D:/Digital/Services/*/logs/app.log
+    pipeline_stages:
+      - match:
+          selector: '{job="windows-services"}'
+          stages:
+            - regex:
+                expression: '.*Services\\(?P<service>[^\\]+)\\logs\\app.log'
+            - labels:
+                service
