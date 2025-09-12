@@ -1,26 +1,19 @@
-server:
-  http_listen_port: 9080
-  grpc_listen_port: 0
+Dear Users,
 
-positions:
-  filename: C:\promtail\positions.yaml
+As part of our ongoing commitment to strengthen security across the Digital Platform Application, we would like to inform you that the Remote Debugging feature will be removed from the HML environment.
 
-clients:
-  - url: http://<LOKI-HOST>:3100/loki/api/v1/push
+This change is being implemented in line with the latest HSBC security policy updates to ensure compliance, reduce potential risks, and safeguard our systems.
 
-scrape_configs:
-  - job_name: windows-services-logs
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: windows-services
-          __path__: D:/Digital/Services/*/logs/app.log
-    pipeline_stages:
-      - match:
-          selector: '{job="windows-services"}'
-          stages:
-            - regex:
-                expression: '.*Services\\(?P<service>[^\\]+)\\logs\\app.log'
-            - labels:
-                service
+Key Points to Note:
+
+The Remote Debugging feature will no longer be available in HML effective [insert date].
+
+There will be no impact on production or other environments.
+
+Developers and testers are requested to use alternate debugging and logging approaches as per the standard guidelines.
+
+For any support or queries, please raise a request via [Jira/ServiceNow/Support Portal link].
+
+We appreciate your cooperation and understanding as we continue to enhance the security and resilience of our applications.
+
+Thank you for your support.
