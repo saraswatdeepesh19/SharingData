@@ -1,71 +1,107 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Video Stream</title>
-    <style>
-        #frame {
-            width: 640px; /* Set your desired width */
-            height: 480px; /* Set your desired height */
-            object-fit: cover; /* Adjusts the image to cover the entire frame */
-        }
-    </style>
-</head>
-<body>
-    <img id="frame" src="" alt="Live Stream">
-    <script>
-        let frameIndex = 0;
-        let retryCount = 0;
-        const maxRetries = 3;
-        const updateInterval = 100; // Update interval in milliseconds
-        let sessionID = '';
+Incident Analysis Report
 
-        // Prompt the user for the session ID
-        function getSessionID() {
-            sessionID = prompt('Please enter your session ID:');
-            if (!sessionID) {
-                alert('Session ID is required!');
-                getSessionID();
-            }
-        }
+Subject: Selenium Grid Hub Nodes Dropping & GraphQL Slowness
 
-        async function imageExists(url) {
-            try {
-                const response = await fetch(url, { method: 'HEAD' });
-                return response.ok;
-            } catch (error) {
-                console.error('Error checking image existence:', error);
-                return false;
-            }
-        }
+Date of Issue: [Insert date/time]
+Prepared By: [Your Name]
 
-        async function updateFrame() {
-            if (!sessionID) {
-                return;
-            }
-            const frame = document.getElementById('frame');
-            const newImageUrl = `http://localhost:8080/data/${sessionID}/test(${frameIndex}).png?timestamp=${new Date().getTime()}`;
-            
-            if (await imageExists(newImageUrl)) {
-                frame.src = newImageUrl;
-                frameIndex++;
-                retryCount = 0; // Reset retry count on successful load
-            } else {
-                retryCount++;
-                if (retryCount >= 2 && retryCount <= maxRetries) {
-                    console.log(`Retry ${retryCount}... waiting for 2 seconds`);
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
-                if (retryCount > maxRetries) {
-                    console.log('Max retries reached. Stopping execution.');
-                    clearInterval(intervalId);
-                }
-            }
-        }
+1. Summary
 
-        getSessionID();
-        const intervalId = setInterval(updateFrame, updateInterval);
-    </script>
-</body>
-</html>
+The Selenium Grid Hub, which manages multiple mobile nodes, suddenly stopped functioning correctly.
+
+All connected nodes were removed from the hub.
+
+GraphQL queries from the hub became extremely slow.
+
+Restarting the hub did not resolve the issue.
+
+Changing the hub’s event bus ports (from defaults 4442/4443 to 7442/7443) restored normal functionality.
+
+2. Observations
+
+Before issue: Hub and nodes were functioning normally.
+
+During issue:
+
+GraphQL /status and /graphql queries were very slow.
+
+Nodes failed to register back to the hub.
+
+Hub restart had no effect.
+
+After workaround:
+
+Changing Event Bus ports (--publish-events & --subscribe-events) allowed nodes to re-register.
+
+GraphQL query performance returned to normal.
+
+When reverting to default ports:
+
+Problem reappeared immediately.
+
+3. Root Cause Analysis
+
+Selenium Grid relies on two ports for its event bus communication:
+
+4442 → Publish events
+
+4443 → Subscribe events
+
+Investigation showed that ports 4442/4443 were already bound by another process (likely an old Selenium process or another service).
+
+Because of this conflict:
+
+Event bus could not initialize properly.
+
+Hub could not communicate with nodes.
+
+GraphQL queries slowed down due to incomplete/blocked registry state.
+
+4. Resolution
+
+Reconfigured hub and nodes to use alternate ports (7442/7443).
+
+Verified that:
+
+Nodes registered successfully.
+
+GraphQL queries responded normally.
+
+Confirmed that the issue was directly linked to port conflict on defaults.
+
+5. Corrective Actions
+
+Check port usage before hub startup
+
+ss -ltnp | grep 4442
+ss -ltnp | grep 4443
+
+
+This ensures no other process occupies the default ports.
+
+Clean up stale processes
+
+pkill -f selenium-server
+
+
+to remove any old hub/node instances.
+
+Implement monitoring
+
+Add monitoring to detect when hub ports are unavailable.
+
+Alert if nodes disconnect unexpectedly.
+
+6. Preventive Actions
+
+Reserve ports 4442/4443 for Selenium in server configuration (firewall + OS-level).
+
+Automate hub startup with a pre-check script to confirm port availability.
+
+Standardize configuration:
+
+If ports are already taken by unavoidable services, permanently shift to alternate ports (7442/7443) and update documentation.
+
+7. Conclusion
+
+The outage was caused by a port conflict on Selenium’s default Event Bus ports (4442/4443). Switching to alternate ports resolved the issue immediately. Long-term prevention requires either reserving default ports for Selenium or standardizing on alternate ports with updated configs.
