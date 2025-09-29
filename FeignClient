@@ -1,11 +1,13 @@
-package com.hsbc.QEP.digitalplatform.feature_toggle_service.repository;
+@echo off
+set LogFile=C:\selenium\logs\selenium-hub.log
+set MaxSize=104857600   REM 100MB in bytes
 
-import com.hsbc.QEP.digitalplatform.feature_toggle_service.entity.Features;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-@Repository
-public interface FeaturesRepository extends JpaRepository<Features, Long> {
-    boolean existsByFeatureName(String featureName);
-    Features findByFeatureName(String featureName);
-}
+powershell -Command ^
+  "if (Test-Path '%LogFile%') { ^
+      $size = (Get-Item '%LogFile%').Length; ^
+      if ($size -gt %MaxSize%) { ^
+          $TimeStamp = Get-Date -Format 'yyyyMMdd_HHmmss'; ^
+          Rename-Item '%LogFile%' ('%LogFile%.' + $TimeStamp); ^
+          New-Item '%LogFile%' -ItemType File | Out-Null ^
+      } ^
+  }"
