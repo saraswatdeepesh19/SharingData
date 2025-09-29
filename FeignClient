@@ -1,18 +1,26 @@
 @echo off
+setlocal enabledelayedexpansion
+
 set "LogFile=C:\selenium\logs\selenium-hub.log"
 set "MaxSize=1024"   REM 1KB for testing
 
 if exist "%LogFile%" (
     for %%A in ("%LogFile%") do set "FileSize=%%~zA"
-    if %FileSize% GTR %MaxSize% (
+    echo Current size: !FileSize! bytes
+
+    if !FileSize! GTR !MaxSize! (
+        rem Format timestamp: YYYYMMDD_HHMMSS
         set "TimeStamp=%DATE:~10,4%%DATE:~4,2%%DATE:~7,2%_%TIME:~0,2%%TIME:~3,2%%TIME:~6,2%"
-        set "TimeStamp=%TimeStamp: =0%"
-        ren "%LogFile%" "selenium-hub.log.%TimeStamp%"
+        set "TimeStamp=!TimeStamp: =0!"
+
+        ren "%LogFile%" "selenium-hub.log.!TimeStamp!"
         type nul > "%LogFile%"
         echo Log rotated: %LogFile%
     ) else (
-        echo Log size %FileSize% bytes is under limit.
+        echo Log size is under limit.
     )
 ) else (
     echo Log file not found: %LogFile%
 )
+
+endlocal
