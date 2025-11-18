@@ -1,32 +1,201 @@
-Selenium Grid Distributed Configuration
-Exploration Report
-This report explores the impact of configuring Selenium Grid 4.8.3 components separately (Hub,
-Distributor, Session Map, Event Bus, and Nodes) compared to a standalone setup. The objective is
-to understand performance, scalability, and architectural implications of distributed configurations,
-especially for environments with desktop and mobile nodes (e.g., Appium).
-1. Selenium Grid Components Overview
-Component Purpose Default Port(s)
-Router (Hub) Entry point for WebDriver requests; routes to Distributor/Sessions 4444
-Distributor Allocates sessions to available Nodes 5553
-Session Map Tracks active sessions and node ownership 5556
-Event Bus Enables inter-component communication 4442 (Pub), 4443 (Sub)
-Node Executes browser or mobile sessions Custom (e.g., 5555, 4723)
-2. Performance and Scalability Impact
-Area Effect Explanation
-Scalability Significant Improvement Each service can be scaled independently to handle high parallel test loads.
-Stability Improved Crashes in one component don’t affect the others; easier recovery and maintenance.
-Resource Utilization More Efficient Allows targeted resource allocation (CPU, memory) per component.
-Network Overhead Slightly Higher More HTTP calls between components introduce minimal latency.
-Setup Complexity Higher Requires multiple services or containers, monitoring, and coordination.
-Load Balancing Better Distributor efficiently allocates sessions across diverse nodes.
-Maintainability Improved Individual component updates without full grid downtime.
-3. Configuration Recommendations
-- Use distributed setup if you run 20+ parallel sessions or multiple node types (desktop + mobile). -
-Keep Event Bus and Distributor on powerful machines to minimize bottlenecks. - Use Docker
-Compose or Kubernetes for orchestration. - Maintain consistent port exposure and environment
-variables across services. - For Appium integration, assign dedicated mobile nodes with limited
-max-sessions (usually 1 per device).
-In conclusion, configuring Selenium Grid components separately leads to substantial gains in
-scalability and stability for medium to large test environments, especially when managing diverse
-workloads. The trade-off is a modest increase in setup and maintenance complexity, which can be
-mitigated using container orchestration tools.
+# Oracle Data Source Configuration
+spring.datasource.url=jdbc:oracle:thin:@//<host>:<port>/<service_name>
+spring.datasource.username=your_oracle_user
+spring.datasource.password=your_oracle_password
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+
+# JPA/Hibernate Configuration (Adjust dialect as needed for your Oracle version)
+spring.jpa.database-platform=org.hibernate.dialect.OracleDialect
+spring.jpa.hibernate.ddl-auto=update  # Use 'create-drop' for testing, 'validate' or 'none' for production
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.Instant;
+
+@Entity
+@Table(name = "ACTIVE_SESSIONS")
+public class SessionRecord {
+
+    @Id // The primary key is the user ID
+    private String userId;
+
+    private Instant loginTime;
+    private String location;
+
+    // Constructors and Getters (omitted for brevity)
+    public SessionRecord() {}
+    
+    public SessionRecord(String userId, Instant loginTime, String location) {
+        this.userId = userId;
+        this.loginTime = loginTime;
+        this.location = location;
+    }
+
+    // Getters and Setters for JPA...
+    public String getUserId() { return userId; }
+    public Instant getLoginTime() { return loginTime; }
+    public String getLocation() { return location; }
+    // ...
+}
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+
+public interface SessionRepository extends JpaRepository<SessionRecord, String> {
+    // This custom method will be used to retrieve all unique locations for metric 2
+    List<SessionRecord> findAllBy();
+}
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class ActiveSessionService {
+
+    private final SessionRepository sessionRepository;
+    private final MeterRegistry meterRegistry;
+    private final Counter totalSessionDuration;
+
+    public ActiveSessionService(SessionRepository sessionRepository, MeterRegistry meterRegistry) {
+        this.sessionRepository = sessionRepository;
+        this.meterRegistry = meterRegistry;
+
+        // --- 1. Counter for cumulative time (Requirement #3) ---
+        this.totalSessionDuration = Counter.builder("user_session_duration_total")
+                .description("Total time users have been logged in (in seconds).")
+                .register(meterRegistry);
+
+        // --- 2. Gauge for total active users (Requirement #1) ---
+        // Micrometer observes the count of active rows in the DB on every scrape.
+        Gauge.builder("active_users_current", sessionRepository, JpaRepository::count)
+             .description("Total number of users currently logged into the platform.")
+             .register(meterRegistry);
+        
+        // --- 3. Active Location Tracking (Requirement #2) ---
+        // We manage the time series dynamically in login/logout as before.
+    }
+
+    @Transactional
+    public void login(String userId, String location) {
+        // 1. DB Session Management: Insert new row
+        SessionRecord newSession = new SessionRecord(userId, Instant.now(), location);
+        sessionRepository.save(newSession);
+
+        // 2. Prometheus Metric Update: Active Location (Gauge)
+        // Creates a time series: active_users_location{user_id="...", location="..."} -> 1
+        meterRegistry.gauge("active_users_location", 
+                             List.of(Tag.of("user_id", userId), Tag.of("location", location)), 
+                             1);
+    }
+
+    @Transactional
+    public void logout(String userId) {
+        SessionRecord session = sessionRepository.findById(userId).orElse(null);
+
+        if (session != null) {
+            // 1. Calculate and Update Metrics
+            Duration sessionDuration = Duration.between(session.getLoginTime(), Instant.now());
+            double durationSeconds = sessionDuration.toSeconds();
+
+            // Update Total Duration Counter (Requirement #3)
+            meterRegistry.counter("user_session_duration_total", "user_id", userId)
+                         .increment(durationSeconds);
+
+            // 2. DB Session Management: Remove row
+            sessionRepository.delete(session);
+
+            // 3. Prometheus Metric Update: Remove Active Location Gauge
+            // Remove the time series for this specific user/location.
+            meterRegistry.getMeters()
+                    .stream()
+                    .filter(meter -> meter.getId().getName().equals("active_users_location") &&
+                                     meter.getId().getTags().contains(Tag.of("user_id", userId)))
+                    .forEach(meterRegistry::remove);
+        }
+    }
+}import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class ActiveSessionService {
+
+    private final SessionRepository sessionRepository;
+    private final MeterRegistry meterRegistry;
+    private final Counter totalSessionDuration;
+
+    public ActiveSessionService(SessionRepository sessionRepository, MeterRegistry meterRegistry) {
+        this.sessionRepository = sessionRepository;
+        this.meterRegistry = meterRegistry;
+
+        // --- 1. Counter for cumulative time (Requirement #3) ---
+        this.totalSessionDuration = Counter.builder("user_session_duration_total")
+                .description("Total time users have been logged in (in seconds).")
+                .register(meterRegistry);
+
+        // --- 2. Gauge for total active users (Requirement #1) ---
+        // Micrometer observes the count of active rows in the DB on every scrape.
+        Gauge.builder("active_users_current", sessionRepository, JpaRepository::count)
+             .description("Total number of users currently logged into the platform.")
+             .register(meterRegistry);
+        
+        // --- 3. Active Location Tracking (Requirement #2) ---
+        // We manage the time series dynamically in login/logout as before.
+    }
+
+    @Transactional
+    public void login(String userId, String location) {
+        // 1. DB Session Management: Insert new row
+        SessionRecord newSession = new SessionRecord(userId, Instant.now(), location);
+        sessionRepository.save(newSession);
+
+        // 2. Prometheus Metric Update: Active Location (Gauge)
+        // Creates a time series: active_users_location{user_id="...", location="..."} -> 1
+        meterRegistry.gauge("active_users_location", 
+                             List.of(Tag.of("user_id", userId), Tag.of("location", location)), 
+                             1);
+    }
+
+    @Transactional
+    public void logout(String userId) {
+        SessionRecord session = sessionRepository.findById(userId).orElse(null);
+
+        if (session != null) {
+            // 1. Calculate and Update Metrics
+            Duration sessionDuration = Duration.between(session.getLoginTime(), Instant.now());
+            double durationSeconds = sessionDuration.toSeconds();
+
+            // Update Total Duration Counter (Requirement #3)
+            meterRegistry.counter("user_session_duration_total", "user_id", userId)
+                         .increment(durationSeconds);
+
+            // 2. DB Session Management: Remove row
+            sessionRepository.delete(session);
+
+            // 3. Prometheus Metric Update: Remove Active Location Gauge
+            // Remove the time series for this specific user/location.
+            meterRegistry.getMeters()
+                    .stream()
+                    .filter(meter -> meter.getId().getName().equals("active_users_location") &&
+                                     meter.getId().getTags().contains(Tag.of("user_id", userId)))
+                    .forEach(meterRegistry::remove);
+        }
+    }
+}
