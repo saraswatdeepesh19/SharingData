@@ -1,201 +1,52 @@
-# Oracle Data Source Configuration
-spring.datasource.url=jdbc:oracle:thin:@//<host>:<port>/<service_name>
-spring.datasource.username=your_oracle_user
-spring.datasource.password=your_oracle_password
-spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+package com.example.monitoring.controller;
 
-# JPA/Hibernate Configuration (Adjust dialect as needed for your Oracle version)
-spring.jpa.database-platform=org.hibernate.dialect.OracleDialect
-spring.jpa.hibernate.ddl-auto=update  # Use 'create-drop' for testing, 'validate' or 'none' for production
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import java.time.Instant;
+import com.example.monitoring.service.ActiveSessionService;
+import com.example.monitoring.service.ThirdPartyLocationService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-@Entity
-@Table(name = "ACTIVE_SESSIONS")
-public class SessionRecord {
+@RestController
+public class SessionController {
 
-    @Id // The primary key is the user ID
-    private String userId;
+    private final ActiveSessionService sessionService;
+    private final ThirdPartyLocationService locationService;
 
-    private Instant loginTime;
-    private String location;
-
-    // Constructors and Getters (omitted for brevity)
-    public SessionRecord() {}
-    
-    public SessionRecord(String userId, Instant loginTime, String location) {
-        this.userId = userId;
-        this.loginTime = loginTime;
-        this.location = location;
+    public SessionController(ActiveSessionService sessionService, ThirdPartyLocationService locationService) {
+        this.sessionService = sessionService;
+        this.locationService = locationService;
     }
 
-    // Getters and Setters for JPA...
-    public String getUserId() { return userId; }
-    public Instant getLoginTime() { return loginTime; }
-    public String getLocation() { return location; }
-    // ...
-}
+    /**
+     * Handles the user login request.
+     * API: POST /api/login?userId={userId}
+     */
+    @PostMapping("/api/login")
+    public ResponseEntity<String> login(
+            @RequestParam("userId") String userId) { 
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import java.util.List;
+        // 1. Get location from third-party/User Management API using ONLY the userId.
+        String location = locationService.getLocationByUserId(userId);
 
-public interface SessionRepository extends JpaRepository<SessionRecord, String> {
-    // This custom method will be used to retrieve all unique locations for metric 2
-    List<SessionRecord> findAllBy();
-}
+        // 2. Handle session and metrics (DB interaction, Prometheus updates)
+        sessionService.login(userId, location);
 
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tag;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+        return ResponseEntity.ok(
+            String.format("Login successful for user: %s from location: %s", userId, location)
+        );
+    }
 
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.stream.Collectors;
-
-@Service
-public class ActiveSessionService {
-
-    private final SessionRepository sessionRepository;
-    private final MeterRegistry meterRegistry;
-    private final Counter totalSessionDuration;
-
-    public ActiveSessionService(SessionRepository sessionRepository, MeterRegistry meterRegistry) {
-        this.sessionRepository = sessionRepository;
-        this.meterRegistry = meterRegistry;
-
-        // --- 1. Counter for cumulative time (Requirement #3) ---
-        this.totalSessionDuration = Counter.builder("user_session_duration_total")
-                .description("Total time users have been logged in (in seconds).")
-                .register(meterRegistry);
-
-        // --- 2. Gauge for total active users (Requirement #1) ---
-        // Micrometer observes the count of active rows in the DB on every scrape.
-        Gauge.builder("active_users_current", sessionRepository, JpaRepository::count)
-             .description("Total number of users currently logged into the platform.")
-             .register(meterRegistry);
+    /**
+     * Handles the user logout request.
+     * API: POST /api/logout?userId={userId}
+     */
+    @PostMapping("/api/logout")
+    public ResponseEntity<String> logout(@RequestParam("userId") String userId) {
         
-        // --- 3. Active Location Tracking (Requirement #2) ---
-        // We manage the time series dynamically in login/logout as before.
-    }
-
-    @Transactional
-    public void login(String userId, String location) {
-        // 1. DB Session Management: Insert new row
-        SessionRecord newSession = new SessionRecord(userId, Instant.now(), location);
-        sessionRepository.save(newSession);
-
-        // 2. Prometheus Metric Update: Active Location (Gauge)
-        // Creates a time series: active_users_location{user_id="...", location="..."} -> 1
-        meterRegistry.gauge("active_users_location", 
-                             List.of(Tag.of("user_id", userId), Tag.of("location", location)), 
-                             1);
-    }
-
-    @Transactional
-    public void logout(String userId) {
-        SessionRecord session = sessionRepository.findById(userId).orElse(null);
-
-        if (session != null) {
-            // 1. Calculate and Update Metrics
-            Duration sessionDuration = Duration.between(session.getLoginTime(), Instant.now());
-            double durationSeconds = sessionDuration.toSeconds();
-
-            // Update Total Duration Counter (Requirement #3)
-            meterRegistry.counter("user_session_duration_total", "user_id", userId)
-                         .increment(durationSeconds);
-
-            // 2. DB Session Management: Remove row
-            sessionRepository.delete(session);
-
-            // 3. Prometheus Metric Update: Remove Active Location Gauge
-            // Remove the time series for this specific user/location.
-            meterRegistry.getMeters()
-                    .stream()
-                    .filter(meter -> meter.getId().getName().equals("active_users_location") &&
-                                     meter.getId().getTags().contains(Tag.of("user_id", userId)))
-                    .forEach(meterRegistry::remove);
-        }
-    }
-}import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tag;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.stream.Collectors;
-
-@Service
-public class ActiveSessionService {
-
-    private final SessionRepository sessionRepository;
-    private final MeterRegistry meterRegistry;
-    private final Counter totalSessionDuration;
-
-    public ActiveSessionService(SessionRepository sessionRepository, MeterRegistry meterRegistry) {
-        this.sessionRepository = sessionRepository;
-        this.meterRegistry = meterRegistry;
-
-        // --- 1. Counter for cumulative time (Requirement #3) ---
-        this.totalSessionDuration = Counter.builder("user_session_duration_total")
-                .description("Total time users have been logged in (in seconds).")
-                .register(meterRegistry);
-
-        // --- 2. Gauge for total active users (Requirement #1) ---
-        // Micrometer observes the count of active rows in the DB on every scrape.
-        Gauge.builder("active_users_current", sessionRepository, JpaRepository::count)
-             .description("Total number of users currently logged into the platform.")
-             .register(meterRegistry);
+        // 1. Handle session and metrics (DB interaction, Prometheus updates)
+        sessionService.logout(userId);
         
-        // --- 3. Active Location Tracking (Requirement #2) ---
-        // We manage the time series dynamically in login/logout as before.
-    }
-
-    @Transactional
-    public void login(String userId, String location) {
-        // 1. DB Session Management: Insert new row
-        SessionRecord newSession = new SessionRecord(userId, Instant.now(), location);
-        sessionRepository.save(newSession);
-
-        // 2. Prometheus Metric Update: Active Location (Gauge)
-        // Creates a time series: active_users_location{user_id="...", location="..."} -> 1
-        meterRegistry.gauge("active_users_location", 
-                             List.of(Tag.of("user_id", userId), Tag.of("location", location)), 
-                             1);
-    }
-
-    @Transactional
-    public void logout(String userId) {
-        SessionRecord session = sessionRepository.findById(userId).orElse(null);
-
-        if (session != null) {
-            // 1. Calculate and Update Metrics
-            Duration sessionDuration = Duration.between(session.getLoginTime(), Instant.now());
-            double durationSeconds = sessionDuration.toSeconds();
-
-            // Update Total Duration Counter (Requirement #3)
-            meterRegistry.counter("user_session_duration_total", "user_id", userId)
-                         .increment(durationSeconds);
-
-            // 2. DB Session Management: Remove row
-            sessionRepository.delete(session);
-
-            // 3. Prometheus Metric Update: Remove Active Location Gauge
-            // Remove the time series for this specific user/location.
-            meterRegistry.getMeters()
-                    .stream()
-                    .filter(meter -> meter.getId().getName().equals("active_users_location") &&
-                                     meter.getId().getTags().contains(Tag.of("user_id", userId)))
-                    .forEach(meterRegistry::remove);
-        }
+        return ResponseEntity.ok("Logout successful for user: " + userId);
     }
 }
