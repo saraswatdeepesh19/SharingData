@@ -1,0 +1,249 @@
+Here is the **Technical Design and Approach Document** formatted for a professional engineering context.
+
+-----
+
+# Technical Design Document: Session Lifecycle Observer (SLO) System
+
+**Version:** 1.0
+**Date:** October 26, 2023
+**Author:** Backend Engineering Team
+**Tech Stack:** Spring Boot, Oracle 19c, Spring Data JPA, Prometheus/Micrometer
+
+-----
+
+## 1\. Executive Summary
+
+This document outlines the architecture and implementation strategy for the **Session Lifecycle Observer (SLO)**. The objective is to track real-time active user sessions by hooking into the Login and Logout events. The system will persist session details in an Oracle Database and expose real-time "Active User" metrics via a Prometheus endpoint for monitoring.
+
+## 2\. System Architecture
+
+The system follows an **Event-Driven Observer Pattern**. The Authentication Service (Login/Logout) acts as the producer, and the SLO Service acts as the consumer. This ensures that the core authentication logic remains decoupled from the metrics/auditing logic.
+
+### 2.1 High-Level Flow
+
+1.  **Login:** User Authenticates $\rightarrow$ SLO Triggered $\rightarrow$ Insert DB Record $\rightarrow$ Increment Prometheus Gauge.
+2.  **Logout:** User Logouts $\rightarrow$ SLO Triggered $\rightarrow$ Update/Remove DB Record $\rightarrow$ Decrement Prometheus Gauge.
+
+### 2.2 Component Diagram
+
+```mermaid
+graph TD
+    User[Client/User] -->|Login/Logout Request| AuthController
+    
+    subgraph Spring Boot Application
+        AuthController -->|Triggers| SLOService
+        
+        SLOService -->|Persist Data| JPA[JPA Repository]
+        SLOService -->|Update Metric| Metrics[Micrometer Registry]
+    end
+    
+    JPA -->|SQL| Oracle[Oracle Database]
+    Metrics -->|Expose| Prom[Prometheus Endpoint]
+    
+    classDef db fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    class Oracle db;
+```
+
+-----
+
+## 3\. Database Design (Oracle)
+
+To support the requirement of storing login time and location, we will use a single table strategy.
+
+*Note: While the requirement asks to "remove data" on logout, a standard Senior Developer approach is to use a "Soft Delete" (marking a flag) or moving data to a history table. Hard deleting rows prevents historical audit trails. The design below supports both, but defaults to Soft Delete for data integrity.*
+
+### 3.1 Schema: `USER_SESSION_ACTIVITY`
+
+```sql
+CREATE TABLE USER_SESSION_ACTIVITY (
+    SESSION_ID    VARCHAR2(64) PRIMARY KEY,
+    USER_ID       VARCHAR2(50) NOT NULL,
+    LOCATION      VARCHAR2(100), -- IP Address or Geo-Location
+    LOGIN_TIME    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    LOGOUT_TIME   TIMESTAMP,
+    IS_ACTIVE     NUMBER(1) DEFAULT 1, -- 1 = Active, 0 = Inactive
+    DEVICE_INFO   VARCHAR2(255)
+);
+
+-- Index for optimizing the count of active users
+CREATE INDEX IDX_ACTIVE_USERS ON USER_SESSION_ACTIVITY(IS_ACTIVE);
+```
+
+-----
+
+## 4\. Implementation Approach
+
+### 4.1 Technology Decisions
+
+  * **Micrometer (Gauge vs. Counter):** We will use a `Gauge` for "Active Users" rather than a `Counter`. A Counter only increments. A Gauge can increment and decrement, representing the current state (like a speedometer).
+  * **Synchronization:** On application startup, the system will query the Oracle DB to count rows where `IS_ACTIVE=1` and initialize the Prometheus Gauge. This ensures metrics survive a server restart.
+
+### 4.2 Code Structure
+
+#### A. The SLO Service Interface
+
+The `SloService` serves as the internal API triggered by the Auth Controller.
+
+```java
+public interface SloService {
+    void captureLoginEvent(String userId, String sessionId, String location);
+    void captureLogoutEvent(String sessionId);
+}
+```
+
+#### B. Implementation Logic (Service Layer)
+
+```java
+@Service
+@Slf4j
+public class SloServiceImpl implements SloService {
+
+    private final UserSessionRepository repository;
+    private final AtomicInteger activeUserGauge;
+
+    public SloServiceImpl(UserSessionRepository repository, MeterRegistry registry) {
+        this.repository = repository;
+        
+        // 1. Initialize Gauge with current DB state to prevent drift on restart
+        Integer currentActive = repository.countByIsActive(1);
+        this.activeUserGauge = new AtomicInteger(currentActive != null ? currentActive : 0);
+
+        // 2. Register Gauge with Prometheus
+        Gauge.builder("application.active.users.count", activeUserGauge, AtomicInteger::get)
+             .description("Real-time count of active user sessions")
+             .register(registry);
+    }
+
+    @Override
+    @Async // Run asynchronously to not block the login response
+    @Transactional
+    public void captureLoginEvent(String userId, String sessionId, String location) {
+        try {
+            UserSessionEntity session = new UserSessionEntity();
+            session.setSessionId(sessionId);
+            session.setUserId(userId);
+            session.setLocation(location);
+            session.setLoginTime(LocalDateTime.now());
+            session.setIsActive(1);
+            
+            repository.save(session);
+            
+            // Increment Metric
+            activeUserGauge.incrementAndGet();
+            log.info("SLO: Login captured for user {}", userId);
+        } catch (Exception e) {
+            log.error("Failed to capture login SLO", e);
+        }
+    }
+
+    @Override
+    @Async
+    @Transactional
+    public void captureLogoutEvent(String sessionId) {
+        repository.findBySessionId(sessionId).ifPresent(session -> {
+            // Requirement: Remove/Update data
+            // Approach: Soft Delete (Update Flag)
+            session.setIsActive(0);
+            session.setLogoutTime(LocalDateTime.now());
+            repository.save(session);
+
+            // Alternatively: repository.delete(session); if hard delete is strictly required.
+
+            // Decrement Metric
+            activeUserGauge.decrementAndGet();
+            log.info("SLO: Logout captured for session {}", sessionId);
+        });
+    }
+}
+```
+
+#### C. Controller Integration
+
+```java
+@RestController
+public class AuthController {
+
+    @Autowired
+    private SloService sloService;
+
+    @PostMapping("/login")
+    public ResponseEntity<String> login(@RequestBody LoginRequest req, HttpServletRequest httpReq) {
+        // ... perform authentication logic ...
+        String sessionId = UUID.randomUUID().toString();
+        
+        // Trigger SLO API
+        sloService.captureLoginEvent(req.getUserId(), sessionId, httpReq.getRemoteAddr());
+        
+        return ResponseEntity.ok(sessionId);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestHeader("X-Session-ID") String sessionId) {
+        // Trigger SLO API
+        sloService.captureLogoutEvent(sessionId);
+        
+        return ResponseEntity.ok().build();
+    }
+}
+```
+
+-----
+
+## 5\. Observability (Prometheus)
+
+The application will expose the standard Spring Boot Actuator endpoint.
+
+**Endpoint:** `GET /actuator/prometheus`
+
+**Sample Output:**
+
+```text
+# HELP application_active_users_count Real-time count of active user sessions
+# TYPE application_active_users_count gauge
+application_active_users_count 42.0
+```
+
+**Prometheus Query (PromQL):**
+To visualize this in Grafana, use the query:
+`application_active_users_count`
+
+-----
+
+## 6\. Edge Cases & Resilience Strategy
+
+### 6.1 Application Restart (State Drift)
+
+  * **Risk:** If the application crashes, the in-memory `AtomicInteger` resets to 0, but users are still logged in.
+  * **Solution:** The logic in the `SloServiceImpl` constructor initializes the counter by running `SELECT COUNT(*) FROM USER_SESSION_ACTIVITY WHERE IS_ACTIVE=1`. This ensures the metric is always accurate upon restart.
+
+### 6.2 Ungraceful Disconnects (Session Timeout)
+
+  * **Risk:** User closes the browser without clicking "Logout". The "Logout API" is never called, causing the DB and Prometheus count to remain high falsely.
+  * **Solution:** Implement a **Scheduled Job** (Spring Scheduler).
+
+<!-- end list -->
+
+```java
+@Scheduled(fixedRate = 60000) // Run every minute
+public void cleanupStaleSessions() {
+    LocalDateTime expiryTime = LocalDateTime.now().minusMinutes(30);
+    List<UserSessionEntity> staleSessions = repository.findActiveSessionsBefore(expiryTime);
+    
+    for (UserSessionEntity session : staleSessions) {
+        session.setIsActive(0);
+        session.setLogoutTime(LocalDateTime.now());
+        repository.save(session);
+        
+        // Adjust the metric
+        metricsService.decrementActiveUsers();
+    }
+}
+```
+
+-----
+
+## 7\. Next Steps
+
+1.  **Review Schema:** Confirm if "Hard Delete" (removing rows) is strictly required or if the proposed "Soft Delete" (Audit Trail) is acceptable.
+2.  **Infrastructure:** Ensure port 9090 (Prometheus) can scrape the Spring Boot application port.
+3.  **Grafana:** Create a dashboard panel connected to the `application_active_users_count` metric.
