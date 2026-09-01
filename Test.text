@@ -1,143 +1,847 @@
-Here’s a Copilot-optimized prompt designed to force senior-level backend code generation (not shallow boilerplate). This is structured so Copilot understands architecture, constraints, and expected coding standards.
-✅ Copilot Prompt (Senior-Level Code Generation)
-Use this as a top-level instruction in your project (README or comment block):
-🚀 Prompt
-Act as a senior backend engineer and generate a production-grade Spring Boot microservice using Java 21, Spring Boot, Spring Security (JWT), and Oracle DB.
-Follow clean architecture, SOLID principles, and enterprise coding standards. Avoid basic/demo-level code.
-1. Project Requirements
-Build a secure service with:
-Token Management System
-Only one token request allowed globally within 15 minutes
-First 2 requests → Manager approval
-Subsequent requests → Lead approval
-Token validity: 15 minutes
-After expiry → reset request counter to 0
-2. APIs to Implement
-Public APIs
-POST /token/request
-Raise token request
-Enforce global lock (15 min rule)
-POST /token/approve
-Approve request (Manager/Lead logic)
-Generate JWT token
-POST /token/reject
-Secured APIs (JWT Required)
-GET /db/table-status?tableName=
-Check if table exists in Oracle
-POST /db/query
-Fetch specific columns with dynamic where clause
-MUST prevent SQL injection
-PUT /db/update
-Update records with conditions
-DELETE /db/delete
-Delete records with conditions
-3. Tech Constraints
-Java 21
-Spring Boot (latest)
-Spring Security + JWT filter
-Oracle DB
-JPA/Hibernate
-Maven project
-4. Database Tables (Oracle)
-Use prefix BS_DP_ for all tables:
-BS_DP_USERS → authentication + roles
-BS_DP_TOKEN_REQUEST → request tracking
-BS_DP_TOKEN_AUDIT → issued tokens
-BS_DP_OPERATION_LOG → all DB operations via token
-5. Critical Business Logic
-Implement thread-safe global request control:
-Java
-if (activeRequestExistsWithin15Min) {
-    throw new BusinessException("Request already in progress");
-}
+# Prompt — Generate Confluence Handover Documentation from a Multi-Service Git Repository
 
-if (requestCount < 2) {
-    approver = MANAGER;
-} else {
-    approver = LEAD;
-}
-After token expiry:
-Java
-requestCount = 0;
-6. Security Requirements
-Implement JWT authentication filter
-Include in token:
-userId
-role
-expiry
-Role-based authorization:
-REQUESTOR → request token
-MANAGER → approve first 2
-LEAD → approve remaining
-7. Code Expectations (VERY IMPORTANT)
-Generate code with:
-✅ Proper layered structure
+You are a senior software architect and technical documentation engineer.
 
-controller/
-service/
-repository/
-entity/
-dto/
-security/
-exception/
-util/
-✅ Must include:
-Global Exception Handler
-Custom Exceptions (BusinessException, UnauthorizedException)
-DTOs (no entity exposure)
-Mapper layer (MapStruct or manual)
-Logging (SLF4J)
-Validation (Jakarta Validation)
-Transaction management
-8. Dynamic Query Handling (IMPORTANT)
-DO NOT use raw string concatenation.
-Use:
-JPA Criteria API OR
-Specification API OR
-Parameterized queries
-Ensure:
-Column whitelist validation
-Table name validation
-Prevent SQL injection
-9. Concurrency Handling
-Use:
-synchronized / ReentrantLock OR
-DB-based locking OR
-Redis (preferred for scalability)
-10. Audit Requirements
-Track:
-Who requested token
-Who approved
-What APIs were called
-Which table/operation executed
-11. Deliverables
-Generate:
-Full project structure
-Entity classes
-Repository interfaces
-Service layer with business logic
-Controllers
-Security config (JWT filter, config)
-Utility classes (JWT utils)
-Exception handling
-Sample request/response payloads
-Oracle-compatible schema (DDL)
-12. Code Quality Expectations
-Follow clean code practices
-Avoid hardcoding
-Use constants/configs
-Use enums for roles/status
-Write readable, maintainable code
-Add meaningful comments only where needed
-⚠️ Strict Instructions
-Do NOT generate toy/demo code
-Do NOT skip security or validation
-Do NOT expose entities directly in APIs
-Do NOT use unsafe SQL
-🔥 Pro Tip
-Paste this once, then ask Copilot:
-“Generate step-by-step starting with project structure and security config”
-If you want, next I can:
-Generate actual production-ready code (Java 21 + Spring Boot 3)
-Or review what Copilot generates and upgrade it to senior-level quality
-Just say 👍
+You are working inside a Git repository that contains **multiple services in a single repository (monorepo)**.
+
+Your task is to inspect the repository and generate a **complete production-ready handover document for all services**, formatted specifically for **Atlassian Confluence**.
+
+The final documentation must be useful to a new engineer who has joined the team and needs to understand, operate, troubleshoot, deploy, and maintain these services without depending on the original developers.
+
+---
+
+# 1. FIRST: Analyze the Repository
+
+Before generating documentation, inspect the repository thoroughly.
+
+Identify:
+
+* All services/applications
+* Service boundaries
+* Programming languages
+* Frameworks
+* Build systems
+* Package managers
+* Shared libraries/modules
+* Common utilities
+* Infrastructure/configuration directories
+* Deployment configurations
+* CI/CD pipelines
+* Dockerfiles
+* Kubernetes manifests
+* Helm charts
+* Terraform/IaC
+* Configuration files
+* Environment files/examples
+* API definitions
+* Database-related code
+* Message queues/topics
+* Scheduled jobs
+* Background workers
+* External integrations
+* Authentication/authorization
+* Monitoring/logging configuration
+* Tests
+* Scripts
+* Documentation already present in the repository
+
+Do not assume that every top-level directory is a service.
+
+Determine whether a directory is actually a deployable service/application by examining its code, configuration, build files, deployment files, and dependencies.
+
+---
+
+# 2. Build a Service Inventory
+
+Create an inventory of all discovered services.
+
+For each service determine, where possible:
+
+* Service name
+* Repository path
+* Purpose
+* Technology stack
+* Entry point
+* Port
+* Runtime
+* Build command
+* Run command
+* Test command
+* Deployment mechanism
+* Dependencies
+* Internal service dependencies
+* External dependencies
+* Database/storage
+* Message broker/queues/topics
+* APIs exposed
+* APIs consumed
+* Scheduled jobs
+* Important configuration
+* Environment variables
+* Secrets required
+* Logging
+* Monitoring
+* Health checks
+* Ownership information if available in the repository
+
+Do not invent information.
+
+If something cannot be determined from the repository, mark it:
+
+`TODO: Not found in repository`
+
+---
+
+# 3. Required Confluence Document Structure
+
+The final document must use this hierarchy:
+
+```text
+CONFLUENCE PAGE
+│
+├── UI TABS
+│
+├── UI TAB: System Overview
+│   ├── Repository Overview
+│   ├── Monorepo Structure
+│   ├── Service Inventory
+│   ├── High-Level Architecture
+│   └── Service Dependency Overview
+│
+├── UI TAB: Getting Started
+│   ├── Prerequisites
+│   ├── Local Development Setup
+│   ├── Repository Setup
+│   ├── Build Instructions
+│   ├── Running Services Locally
+│   └── Running Tests
+│
+├── UI TAB: Services
+│   │
+│   ├── UI TAB: <Service 1>
+│   │   ├── Overview
+│   │   ├── Responsibilities
+│   │   ├── Repository Location
+│   │   ├── Technology Stack
+│   │   ├── Architecture
+│   │   ├── Entry Points
+│   │   ├── APIs
+│   │   ├── Dependencies
+│   │   ├── Configuration
+│   │   ├── Database / Storage
+│   │   ├── Messaging
+│   │   ├── Scheduled Jobs
+│   │   ├── Error Handling
+│   │   ├── Logging & Monitoring
+│   │   ├── Health Checks
+│   │   ├── Build & Run
+│   │   ├── Deployment
+│   │   ├── Troubleshooting
+│   │   └── Known Limitations
+│   │
+│   ├── UI TAB: <Service 2>
+│   │   └── Same structure
+│   │
+│   └── UI TAB: <Service N>
+│       └── Same structure
+│
+├── UI TAB: Infrastructure & Dependencies
+│   ├── Databases
+│   ├── Caches
+│   ├── Message Brokers
+│   ├── External APIs
+│   ├── Third-Party Integrations
+│   └── Infrastructure Dependencies
+│
+├── UI TAB: Configuration & Secrets
+│   ├── Configuration Management
+│   ├── Environment Variables
+│   ├── Secrets
+│   ├── Configuration by Environment
+│   └── Important Configuration Notes
+│
+├── UI TAB: CI/CD & Deployment
+│   ├── CI Pipeline
+│   ├── CD Pipeline
+│   ├── Build Process
+│   ├── Deployment Process
+│   ├── Environments
+│   ├── Release Process
+│   ├── Rollback
+│   └── Deployment Troubleshooting
+│
+├── UI TAB: Operations & Troubleshooting
+│   ├── Monitoring
+│   ├── Logging
+│   ├── Alerts
+│   ├── Common Issues
+│   ├── Debugging Procedures
+│   ├── Incident Handling
+│   └── Recovery Procedures
+│
+└── UI TAB: Handover Summary
+    ├── Critical Components
+    ├── Things New Engineers Must Know
+    ├── Known Issues
+    ├── Technical Debt
+    ├── Operational Risks
+    ├── Important Commands
+    ├── Important Links
+    └── Open Questions / TODOs
+```
+
+IMPORTANT:
+
+The `Services` section should contain one UI Tab for each actual service discovered in the repository.
+
+Do not create service documentation for directories that are merely libraries, utilities, tests, or configuration unless they are operationally significant.
+
+---
+
+# 4. Service Documentation
+
+For EVERY discovered service, generate a dedicated service section.
+
+Use this structure:
+
+## Service Overview
+
+Explain:
+
+* What the service does
+* Why it exists
+* What business/technical responsibility it owns
+* What it does NOT own, if this can be determined
+
+## Repository Location
+
+Show the exact repository path.
+
+Example:
+
+```text
+/services/payment-service
+```
+
+## Technology Stack
+
+Create a table:
+
+| Category        | Details |
+| --------------- | ------- |
+| Language        |         |
+| Framework       |         |
+| Runtime         |         |
+| Build Tool      |         |
+| Package Manager |         |
+| Database        |         |
+| Cache           |         |
+| Messaging       |         |
+| Container       |         |
+| Deployment      |         |
+
+Only populate values supported by repository evidence.
+
+## Architecture
+
+Explain the internal architecture.
+
+Identify important components such as:
+
+* Controllers
+* Routes
+* Handlers
+* Services
+* Business logic
+* Repositories
+* Clients
+* Workers
+* Consumers
+* Producers
+* Schedulers
+* Middleware
+* Configuration
+* Persistence layer
+
+Where useful, include a Mermaid diagram.
+
+Example:
+
+```mermaid
+flowchart LR
+    Client --> Service
+    Service --> Database
+    Service --> MessageBroker
+    Service --> ExternalAPI
+```
+
+The diagram must reflect the actual repository architecture rather than being generic.
+
+## APIs
+
+Document discovered APIs.
+
+Create a table:
+
+| Method | Endpoint | Purpose | Authentication | Request | Response |
+| ------ | -------- | ------- | -------------- | ------- | -------- |
+
+Look for API information in:
+
+* Controllers
+* Routes
+* OpenAPI/Swagger
+* GraphQL schemas
+* API specifications
+* Tests
+* README files
+
+Do not invent endpoints.
+
+## Dependencies
+
+Separate:
+
+### Internal Dependencies
+
+Services from the same repository that this service depends on.
+
+### External Dependencies
+
+Third-party services, APIs, infrastructure, or systems.
+
+For each dependency explain:
+
+* Why it is required
+* How it is used
+* What happens if it is unavailable
+
+## Configuration
+
+Identify configuration from:
+
+* Environment variables
+* Configuration files
+* YAML
+* JSON
+* Properties files
+* Helm values
+* Docker configuration
+* Kubernetes configuration
+* Deployment manifests
+
+Create:
+
+| Variable / Configuration | Purpose | Required | Default | Example | Secret? |
+| ------------------------ | ------- | -------- | ------- | ------- | ------- |
+
+NEVER expose actual secret values.
+
+If a secret exists in the repository accidentally, do NOT reproduce the value.
+
+Instead write:
+
+`SECRET: Value intentionally omitted`
+
+## Database / Storage
+
+Document:
+
+* Database type
+* Connection mechanism
+* Schema/migrations
+* Tables/entities
+* Important relationships
+* Read/write behavior
+* Caching
+* Data retention if discoverable
+
+Do not expose credentials.
+
+## Messaging
+
+If applicable, document:
+
+* Broker
+* Queue/topic names
+* Producer behavior
+* Consumer behavior
+* Message format
+* Retry behavior
+* Dead-letter handling
+* Important failure scenarios
+
+## Scheduled Jobs
+
+Identify:
+
+* Cron jobs
+* Scheduled tasks
+* Workers
+* Batch processes
+* Queue consumers
+
+Document:
+
+| Job | Schedule | Purpose | Service | Failure Handling |
+| --- | -------- | ------- | ------- | ---------------- |
+
+## Logging & Monitoring
+
+Document:
+
+* Log framework
+* Important log messages
+* Log levels
+* Correlation/request IDs
+* Metrics
+* Traces
+* Health endpoints
+* Readiness/liveness checks
+* Monitoring configuration
+* Alert configuration
+
+## Build & Run
+
+Provide exact commands discovered from the repository.
+
+For example:
+
+```bash
+# Install dependencies
+...
+
+# Build
+...
+
+# Run
+...
+
+# Test
+...
+
+# Lint
+...
+```
+
+Do NOT invent commands.
+
+Use commands from:
+
+* package.json
+* Makefile
+* Gradle
+* Maven
+* pom.xml
+* build scripts
+* Dockerfile
+* README
+* CI configuration
+* repository scripts
+
+## Deployment
+
+Explain:
+
+* How the service is packaged
+* Containerization
+* Image creation
+* Deployment manifests
+* Kubernetes resources
+* Helm charts
+* Environment-specific configuration
+* CI/CD pipeline
+* Deployment order
+* Rollback process
+
+## Troubleshooting
+
+Create a practical troubleshooting table:
+
+| Problem | Possible Cause | How to Diagnose | Resolution |
+| ------- | -------------- | --------------- | ---------- |
+
+Only include issues that can be inferred from code/configuration/history/documentation.
+
+Clearly distinguish repository evidence from reasonable operational recommendations.
+
+## Known Limitations
+
+Document:
+
+* TODOs
+* FIXME comments
+* Known technical limitations
+* Deprecated dependencies
+* Workarounds
+* Technical debt
+* Potential risks
+
+---
+
+# 5. Cross-Service Architecture
+
+After documenting individual services, analyze how the services interact.
+
+Create a service dependency matrix:
+
+| Service | Depends On | Dependency Type | Purpose |
+| ------- | ---------- | --------------- | ------- |
+
+Also create a high-level architecture diagram.
+
+Example:
+
+```mermaid
+flowchart TD
+    Client --> API
+    API --> ServiceA
+    ServiceA --> ServiceB
+    ServiceA --> Database
+    ServiceB --> MessageBroker
+    ServiceB --> ExternalSystem
+```
+
+Only include relationships supported by repository evidence.
+
+---
+
+# 6. Local Development
+
+Create a complete "Getting Started" section.
+
+Explain:
+
+1. Required tools
+2. Repository setup
+3. Dependency installation
+4. Environment configuration
+5. Local infrastructure requirements
+6. How to start each service
+7. How to run tests
+8. How to run individual services
+9. How to run multiple services together
+10. Common local-development problems
+
+If Docker Compose or another local orchestration mechanism exists, document it.
+
+---
+
+# 7. CI/CD
+
+Inspect all CI/CD configuration.
+
+Look for:
+
+* GitHub Actions
+* GitLab CI
+* Jenkins
+* Azure DevOps
+* CircleCI
+* Bitbucket Pipelines
+* Docker builds
+* Helm deployments
+* Kubernetes deployment
+* Terraform
+* Environment promotion
+
+Document the actual pipeline.
+
+Create:
+
+```text
+Code Commit
+    ↓
+Build
+    ↓
+Unit Tests
+    ↓
+Static Analysis
+    ↓
+Package / Docker Build
+    ↓
+Artifact / Image
+    ↓
+Deploy
+    ↓
+Validation
+```
+
+Modify this flow to match the actual repository.
+
+---
+
+# 8. Security
+
+Document security-related implementation.
+
+Look for:
+
+* Authentication
+* Authorization
+* JWT
+* OAuth
+* API keys
+* Service-to-service authentication
+* TLS
+* Secret management
+* Role-based access
+* Security middleware
+* Input validation
+
+Never expose actual secrets, tokens, credentials, private keys, or passwords.
+
+---
+
+# 9. Operational Handover
+
+Create a dedicated operational handover section.
+
+Include:
+
+### Critical Services
+
+Identify services that are most important to system operation.
+
+### Failure Impact
+
+Explain what happens if each service fails.
+
+### Startup Dependencies
+
+Identify services/infrastructure that must be available before another service starts.
+
+### Data Dependencies
+
+Identify critical databases/storage systems.
+
+### External Dependencies
+
+Identify external systems that could cause failures.
+
+### Common Failure Scenarios
+
+Document likely operational failure scenarios based on the implementation.
+
+### Recovery
+
+Explain how engineers can restart, redeploy, rollback, or recover services using repository-supported procedures.
+
+---
+
+# 10. Important Commands
+
+Create a consolidated command reference.
+
+Example:
+
+| Purpose                  | Command |
+| ------------------------ | ------- |
+| Build Service A          |         |
+| Run Service A            |         |
+| Test Service A           |         |
+| Build Service B          |         |
+| Run Service B            |         |
+| Run all services         |         |
+| Run local infrastructure |         |
+
+Only include commands that actually exist or can be confidently derived from repository configuration.
+
+---
+
+# 11. Documentation Evidence
+
+For every important technical conclusion, prefer repository evidence from:
+
+1. Source code
+2. Configuration
+3. Deployment manifests
+4. CI/CD configuration
+5. Tests
+6. Existing README/documentation
+7. Comments
+
+Do not make assumptions when evidence is unavailable.
+
+At the end, create:
+
+## Open Questions / Missing Information
+
+List anything that could not be determined from the repository.
+
+Example:
+
+| Item                | Missing Information            | Recommended Owner |
+| ------------------- | ------------------------------ | ----------------- |
+| Production database | Connection details not present | Platform Team     |
+| Service ownership   | Not defined in repository      | Engineering Team  |
+
+---
+
+# 12. Confluence UI Tabs Requirement
+
+The final output must represent the document using:
+
+```text
+UI TABS
+    ├── UI TAB
+    ├── UI TAB
+    ├── UI TAB
+    └── UI TAB
+```
+
+For the Services section:
+
+```text
+UI TAB: Services
+
+    UI TAB: Service A
+    UI TAB: Service B
+    UI TAB: Service C
+    ...
+```
+
+Do not flatten the service documentation into one long page.
+
+Each service must have its own UI Tab.
+
+---
+
+# 13. OUTPUT FORMAT — VERY IMPORTANT
+
+Generate TWO files:
+
+### File 1: `confluence-handover.md`
+
+A human-readable version of the complete documentation.
+
+Use this syntax to make the macro hierarchy explicit:
+
+```text
+[UI TABS]
+
+[UI TAB: System Overview]
+
+...
+
+[END UI TAB]
+
+[UI TAB: Services]
+
+[UI TAB: Service A]
+
+...
+
+[END UI TAB]
+
+[UI TAB: Service B]
+
+...
+
+[END UI TAB]
+
+[END UI TAB]
+
+[END UI TABS]
+```
+
+### File 2: `confluence-handover-storage.xhtml`
+
+Generate the equivalent **Confluence Storage Format XHTML**.
+
+The XHTML must use Confluence macro markup for the UI Tabs/UI Tab macros.
+
+IMPORTANT:
+
+Do not use generic Markdown in this file.
+
+The goal is that this file can be used with Confluence's API or a suitable Confluence import/update mechanism to create the page while preserving the UI Tabs/UI Tab macro structure.
+
+Before generating the XHTML, determine the correct macro names and parameters used by the UI Tabs/UI Tab implementation available to this repository/team.
+
+If the repository does not contain evidence of which UI Tabs plugin/macro is being used, DO NOT invent the macro syntax.
+
+Instead:
+
+1. Generate the Markdown documentation.
+2. Generate a clearly marked XHTML template.
+3. Add a `CONFLUENCE MACRO CONFIGURATION REQUIRED` section explaining exactly which macro information is needed.
+
+---
+
+# 14. Quality Rules
+
+Before finishing, perform a documentation quality review.
+
+Check:
+
+* Did you identify every actual service?
+* Did you avoid treating shared libraries as services?
+* Did you inspect deployment configuration?
+* Did you inspect CI/CD?
+* Did you inspect configuration?
+* Did you inspect API definitions?
+* Did you inspect database migrations?
+* Did you inspect messaging?
+* Did you inspect scheduled jobs?
+* Did you inspect tests?
+* Did you inspect Docker/Kubernetes/Helm files?
+* Did you inspect environment configuration?
+* Did you inspect existing README/documentation?
+* Did you identify service dependencies?
+* Did you identify external dependencies?
+* Did you identify operational risks?
+* Did you avoid exposing secrets?
+* Did you avoid inventing technical details?
+* Did you identify missing information?
+* Does every service have its own UI Tab?
+* Is the document usable by a new engineer?
+
+---
+
+# 15. Final Output Summary
+
+At the very end, provide:
+
+## Repository Analysis Summary
+
+```text
+Services discovered: X
+Shared libraries discovered: X
+Databases identified: X
+Message brokers identified: X
+External integrations identified: X
+Deployment mechanisms identified: X
+CI/CD pipelines identified: X
+```
+
+## Services
+
+| Service | Path | Technology | Deployment | Status |
+| ------- | ---- | ---------- | ---------- | ------ |
+
+## Important Missing Information
+
+List all information that could not be determined from the repository.
+
+## Documentation Confidence
+
+For each service classify documentation confidence as:
+
+* HIGH — strong evidence in source/configuration
+* MEDIUM — partially inferred from repository
+* LOW — significant information missing
+
+Do not hide uncertainty.
+
+---
+
+# START
+
+Now inspect the repository from the root.
+
+Do not immediately start writing the documentation.
+
+First understand the repository structure and identify the services and their relationships.
+
+Then generate the complete Confluence handover documentation according to the requirements above.
